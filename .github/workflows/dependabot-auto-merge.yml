@@ -1,0 +1,52 @@
+name: Dependabot auto-merge
+
+# CI gating happens INSIDE this workflow rather than via branch protection:
+# required checks aren't available on private free-plan repos (where this
+# project's private forks live), and without them GitHub-native auto-merge
+# would merge before tests finish. This job polls the `test` check (the
+# Tests workflow job) and merges only when it passes — identical behavior on
+# the public repo and on private mirrors, no repo settings required.
+# The poll targets that one check by name — `gh pr checks --watch` would
+# deadlock waiting on this very workflow's own in-progress check.
+#
+# Major version bumps are deliberately NOT auto-merged: floor-pinned
+# requirements (>=) mean a major bump can change runtime behavior in ways the
+# test suite won't fully exercise (e.g. an openai SDK rewrite). Those PRs stay
+# open for human review. To auto-merge everything, drop the `if` on the
+# enable step.
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # PR author check (not just actor): only dependabot's own PRs qualify.
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    steps:
+      - name: Fetch dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98  # v3.1.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for tests, then merge (patch/minor only)
+        if: steps.metadata.outputs.update-type != 'version-update:semver-major'
+        run: |
+          for i in $(seq 1 60); do
+            STATE=$(gh pr checks "$PR_URL" --json name,bucket \
+              -q '.[] | select(.name == "test") | .bucket')
+            case "$STATE" in
+              pass) gh pr merge --squash "$PR_URL"; exit 0 ;;
+              fail|cancel) echo "test check: $STATE — not merging"; exit 1 ;;
+              *) sleep 10 ;;  # pending or not yet reported
+            esac
+          done
+          echo "Timed out waiting for test check"; exit 1
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

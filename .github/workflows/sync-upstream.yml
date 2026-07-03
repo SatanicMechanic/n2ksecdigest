@@ -1,0 +1,72 @@
+name: Sync from upstream
+
+# Private-fork automation: merges the public upstream (dependabot-maintained
+# Actions pins and dependency floors) into this repo on a schedule.
+#
+# Ships in the public repo but is inert there (repo guard below) — it only
+# does work in private mirrors. Design notes:
+#   - Tests run INSIDE this job as the merge gate: pushes made with
+#     GITHUB_TOKEN do not trigger the Tests workflow, so gating must be
+#     inline. A red suite or a merge conflict fails the job (GitHub emails
+#     on scheduled-workflow failure) and nothing is pushed.
+#   - Requires shared ancestry: run the one-time
+#     `git merge upstream/main --allow-unrelated-histories` setup first.
+#   - A conflict usually means upstream touched stack.txt's template or a
+#     file you changed privately — resolve manually, keeping your version
+#     of stack.txt.
+
+on:
+  schedule:
+    # Mondays 08:00 UTC — ahead of the 11:00 UTC Monday digest run.
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  UPSTREAM_REPO: SatanicMechanic/n2ksecdigest
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # No-op on the upstream repo itself.
+    if: github.repository != 'SatanicMechanic/n2ksecdigest'
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
+        with:
+          enable-cache: true
+          python-version: '3.12'
+
+      - name: Merge upstream/main
+        id: merge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
+          git fetch upstream main
+          BEFORE=$(git rev-parse HEAD)
+          git merge --no-edit upstream/main
+          if [ "$(git rev-parse HEAD)" = "$BEFORE" ]; then
+            echo "Already up to date."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run tests (merge gate)
+        if: steps.merge.outputs.changed == 'true'
+        run: |
+          uv venv
+          uv pip install -r requirements.txt -r requirements-dev.txt
+          uv run pytest -q
+
+      - name: Push
+        if: steps.merge.outputs.changed == 'true'
+        run: git push origin HEAD:main

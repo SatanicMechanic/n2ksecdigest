@@ -1,0 +1,10 @@
+.env
+last_run.txt
+.DS_Store
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+ai-findings/.state/
+state.json
+LAUNCH_NOTES.md

@@ -1,0 +1,62 @@
+name: Need to Know
+
+on:
+  schedule:
+    # 11:00 UTC = 04:00 PDT (UTC-7) / 03:00 PST (UTC-8), weekdays only
+    - cron: '0 11 * * 1-5'
+    # 23:00 UTC = 16:00 PDT / 15:00 PST — catches breaking news; skips if morning already sent
+    - cron: '0 23 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+        with:
+          enable-cache: true
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv pip install -r requirements.txt
+
+      - name: Restore digest state
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: state.json
+          key: digest-state-${{ github.run_id }}
+          restore-keys: digest-state-
+
+      - name: Run digest
+        env:
+          XAI_API_KEY:       ${{ secrets.XAI_API_KEY }}
+          GH_MODELS_TOKEN:   ${{ secrets.GH_MODELS_TOKEN }}
+          RESEND_API_KEY:    ${{ secrets.RESEND_API_KEY }}
+          DIGEST_TO_EMAIL:   ${{ vars.DIGEST_TO_EMAIL }}
+          DIGEST_FROM_EMAIL: ${{ vars.DIGEST_FROM_EMAIL }}
+          SKIP_REPORT_TO_EMAIL: ${{ vars.SKIP_REPORT_TO_EMAIL }}
+          BRAVE_API_KEY:     ${{ secrets.BRAVE_API_KEY }}
+          BRAVE_GOGGLES:     ${{ vars.BRAVE_GOGGLES }}
+        run: uv run python digest.py
+
+      - name: Save digest state
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: state.json
+          key: digest-state-${{ github.run_id }}

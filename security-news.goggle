@@ -1,0 +1,63 @@
+! name: n2ksecdigest security news
+! description: Boosts primary-source security news, vendor advisories, and research blogs; downranks aggregator and trending-news backfill. Used by the n2ksecdigest Brave Search pass.
+! public: true
+! author: n2ksecdigest
+
+! To use: host this file at a publicly reachable raw URL (the public GitHub
+! repo works: https://raw.githubusercontent.com/<owner>/<repo>/main/security-news.goggle)
+! and set the BRAVE_GOGGLES env var / Actions variable to that URL.
+! Boost-only by design: it biases ranking toward known-good sources without
+! hiding genuine news from elsewhere. Hard exclusions stay in config.py
+! blocklists where they are testable.
+
+! --- Primary security news outlets ---
+$boost=3,site=bleepingcomputer.com
+$boost=3,site=thehackernews.com
+$boost=3,site=krebsonsecurity.com
+$boost=2,site=securityweek.com
+$boost=2,site=theregister.com
+$boost=2,site=arstechnica.com
+$boost=2,site=cyberscoop.com
+$boost=2,site=therecord.media
+$boost=2,site=darkreading.com
+$boost=2,site=helpnetsecurity.com
+
+! --- Government / coordination ---
+$boost=3,site=cisa.gov
+$boost=2,site=cert.europa.eu
+$boost=2,site=ncsc.gov.uk
+
+! --- Vendor advisories & security blogs (primary sources) ---
+$boost=2,site=github.blog
+$boost=2,site=aws.amazon.com
+$boost=2,site=cloud.google.com
+$boost=2,site=msrc.microsoft.com
+$boost=2,site=openssl-library.org
+$boost=2,site=openwall.com
+
+! --- Research / threat-intel blogs ---
+$boost=2,site=unit42.paloaltonetworks.com
+$boost=2,site=talosintelligence.com
+$boost=2,site=labs.watchtowr.com
+$boost=2,site=greynoise.io
+$boost=2,site=rapid7.com
+$boost=2,site=wiz.io
+$boost=2,site=sentinelone.com
+$boost=2,site=welivesecurity.com
+$boost=2,site=research.checkpoint.com
+
+! --- Aggregator / trending backfill downranks ---
+$downrank=3,site=msn.com
+$downrank=3,site=news.google.com
+$downrank=3,site=biztoc.com
+$downrank=2,site=slashdot.org
+$downrank=2,site=newsbreak.com
+
+! Observed SEO-junk / forum-recap backfill from skip-report review (June 2026)
+$downrank=3,site=xloggs.com
+$downrank=2,site=ntcompatible.com
+$downrank=2,site=windowsforum.com
+$downrank=2,site=sysnative.com
+$downrank=2,site=tech-insider.org
+$downrank=2,site=coursiv.io
+$downrank=2,site=securityscientist.net

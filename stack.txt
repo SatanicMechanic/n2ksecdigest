@@ -1,0 +1,18 @@
+## What we build and ship
+- **SaaS platform:** [Your cloud provider and key services — e.g. AWS: EKS, Lambda, S3, RDS]
+- **On-premises products:** [What you ship to customer environments, if any — appliances, containers, installers]
+- **Agents and clients:** [Where your agents/clients run on customer infrastructure, if any]
+- **Languages/Runtimes:** [Your languages and frameworks]
+- **Base images:** [Your container/VM base images]
+- **Customer environments where agents/clients run:** [OS targets, if any — and state clearly that only the OS your own software runs on is in scope]
+- **CI/CD & SCM:** [Your CI/CD toolchain]
+- **Security tooling:** [Your AppSec and cloud security tools]
+- **Out of scope:** Consumer/SOHO software, network hardware, shared-hosting panels (cPanel, Plesk), WordPress ecosystem, consumer mobile (Android/iOS) and endpoint OS/browser/hardware-baseband exploitation research. [Add explicit exclusions for product families adjacent to your stack — named exclusions prevent the LLM from stretching relevance.]
+- **Version policy:** Cover all currently supported releases; do not pin to specific versions.
+
+<!--
+This is the generic template shipped with the public repo. The bot runs with
+it, but the digest is only useful once this file describes YOUR stack.
+Edit it in your PRIVATE fork/mirror — never commit a real stack description
+to a public repo (see README "Stack description" section).
+-->
