@@ -1,0 +1,6 @@
+# Fork-divergent files: private mirrors keep their own versions on sync.
+README.md            merge=ours
+CLAUDE.md            merge=ours
+security-news.goggle merge=ours
+stack.txt            merge=ours
+.gitignore           merge=ours
