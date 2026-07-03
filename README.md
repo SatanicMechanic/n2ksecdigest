@@ -36,21 +36,21 @@ Typical output: **0 or 1 item per day.** SKIP is the default. 3 items is rare.
 │  1. RSS fetch        round-robin across FEEDS, per-feed cap,             │
 │                      blocklist filter, state/cooldown filter             │
 │                                                                          │
-│  2. Query gen        LLM generates 1 anchored + 5 independent +         │
+│  2. Query gen        LLM generates 1 anchored + 5 independent +          │
 │                      1 tooling-scan + 1 ai-lab; on the Monday catch-up   │
 │                      run also 1 compliance + 1 PQC (slow-moving beats,   │
 │                      weekly-only to avoid daily backfill noise)          │
 │                                                                          │
 │  3. Brave Search     executes queries (fewer results fetched for the     │
-│                      backfill-prone abstract query types), dedupes        │
-│                      against RSS pool                                     │
+│                      backfill-prone abstract query types), dedupes       │
+│                      against RSS pool                                    │
 │                                                                          │
-│  4. Triage           two parallel LLM calls:                            │
-│                        • prompt_threat.txt — fire-tier bar (threats +   │
+│  4. Triage           two parallel LLM calls:                             │
+│                        • prompt_threat.txt — fire-tier bar (threats +    │
 │                          compliance + TTP residual)                      │
-│                        • prompt_tooling.txt — tooling bar (platform,    │
-│                          CI/CD, OSS features, ≤1 item)                  │
-│                      results merged with URL-dedup, global cap of 3     │
+│                        • prompt_tooling.txt — tooling bar (platform,     │
+│                          CI/CD, OSS features, ≤1 item)                   │
+│                      results merged with URL-dedup, global cap of 3      │
 │                                                                          │
 │  5. Enrich           fetch each selected article (≤3), LLM sharpens      │
 │                      why/action with full text; best-effort, falls       │
