@@ -1,6 +1,6 @@
 # n2ksecdigest
 
-Automated product-security news digest. Runs on GitHub Actions weekday mornings, fetches from RSS and web search, triages through xAI Grok-4.3 (with GitHub Models GPT-4.1-mini as fallback) against a **news-cycle fire-tier bar**, and emails a short digest via Resend.
+Automated product-security news digest. Runs on GitHub Actions twice each weekday, fetches from RSS and web search, triages through xAI Grok-4.3 (with GitHub Models GPT-4.1-nano as fallback) against a **news-cycle fire-tier bar**, and emails a short digest via Resend.
 
 ## Should you actually use this?
 
@@ -8,7 +8,7 @@ For most security engineers, **a well-tuned set of Google News Alerts is the rig
 
 The reason to fork this instead is if you specifically want:
 
-- **The LLM applying the editorial bar**, not you. SKIP-default; most days the inbox is empty.
+- **The LLM applying the editorial bar**, not you. SKIP-default: no email unless something clears the bar — in practice an email arrives a bit more than half of days, almost always with a single item.
 - **Stack-aware scope filtering.** "Cisco out of scope" and "Microsoft = Windows Server only" don't have to live in your head.
 - **Synthesis, not headlines.** Each item arrives as a rewritten headline + "why this matters to your stack" + "action to take" — 30 seconds of decision, not 5 minutes of reading.
 - **Aggressive dedup + state.** Trailing coverage doesn't recycle for weeks; sent items are suppressed for 30 days.
@@ -27,7 +27,11 @@ What it surfaces falls into three categories, each held to the same SKIP-preferr
 
 3. **Compliance and policy changes** — substantive regulatory or policy shifts affecting SaaS and software vendors that a product-security team should be aware of.
 
-Typical output: **0 or 1 item per day.** SKIP is the default. 3 items is rare.
+Typical output: **0–2 items per day**, delivered as an email a bit more than half of days. SKIP is the default on quiet days; 3 items is rare.
+
+### Where it fits alongside weekly newsletters
+
+This bot is complementary to — not a replacement for — weekly digests like [SANS NewsBites](https://www.sans.org/newsletters/newsbites/) and [tl;dr sec](https://tldrsec.com/). Those give you breadth, analysis, and tooling round-ups on a weekly cadence; this bot covers the narrow gap they can't: **same-day notice of the handful of events that shouldn't wait for Friday** — active exploitation of something in your stack, an emergency advisory, an unfolding supply-chain compromise. Read the newsletters for depth; let this interrupt you only when the news cycle says now.
 
 ## Pipeline
 
@@ -129,7 +133,7 @@ cd your-private-repo
 git remote add upstream git@github.com:SatanicMechanic/n2ksecdigest.git
 ```
 
-Then edit `stack.txt` with your real stack and commit — in the private repo this is safe and is the single source of truth for both local runs and CI. To pull upstream updates (dependency floors, Actions pin bumps), either run `git fetch upstream && git merge upstream/main` manually, or rely on the included `sync-upstream.yml` workflow: it merges upstream weekly, runs the test suite as a gate, and pushes only if green (inert on this public repo; active in your mirror). Your `stack.txt` edit lives on a private commit; merges only conflict if the upstream template itself changes.
+Then edit `stack.txt` with your real stack and commit — in the private repo this is safe and is the single source of truth for both local runs and CI. To pull upstream updates (dependency floors, Actions pin bumps), either run `git fetch upstream && git merge upstream/main` manually, or rely on the included `sync-upstream.yml` workflow: it merges upstream weekly, runs the test suite as a gate, and pushes only if green (inert on this public repo; active in your mirror). One setup note: the built-in Actions token cannot push changes to workflow files, so syncs that include `.github/workflows/` changes need a fine-grained PAT (your mirror only; Contents + Workflows read/write) stored as a `SYNC_TOKEN` secret — without it, the sync works until a workflow file changes upstream, then fails loudly. Your `stack.txt` edit lives on a private commit; merges only conflict if the upstream template itself changes.
 
 If `stack.txt` is missing or empty the bot exits with an error rather than silently triaging with no stack context.
 
@@ -193,8 +197,8 @@ The cache save step runs with `if: always()` so state is preserved even when the
 
 Almost free at current usage:
 
-- xAI Grok-4.3 (primary): paid per-token, but volume is small — 5–6 query/triage calls per run (anchored query when warranted, independent query, combined compliance+PQC query, tooling-scan, ai-lab, threat + tooling triage in parallel; ~25K tokens), plus up to 3 short enrichment calls on days when items are actually selected (most days: zero). Reasoning is disabled to keep latency and cost down.
-- GitHub Models GPT-4.1-mini (fallback): free tier, only billed when the xAI call fails.
+- xAI Grok-4.3 (primary): paid per-token, but volume is small — 5–6 query/triage calls per run (anchored query when warranted, independent query, combined compliance+PQC query, tooling-scan, ai-lab, threat + tooling triage in parallel; ~25K tokens), plus up to 3 short enrichment calls on days when items are actually selected (most days: zero). Reasoning effort is pinned to "low" — enough judgment for triage-style calls without deep-reasoning latency or cost.
+- GitHub Models GPT-4.1-nano (fallback): free tier, only used when the xAI call fails (nano because free-tier budgets can exhaust mid-cycle on mini-class models).
 - GitHub Actions: ~1 min/run, well within free tier
 - Brave Search: 2,000 queries/month free; this bot uses ~160/month (8 queries/run × ~20 runs)
 - Resend: 3,000 emails/month free; this sends ≤22/month — and typically far fewer given the SKIP-preferred bar
@@ -204,7 +208,7 @@ Almost free at current usage:
 
 - **All feeds dead**: RSS pool empty; search-only digest if queries still generate; SKIP if nothing found
 - **Brave Search down / key missing**: `fetch_search_articles` returns empty, RSS-only digest
-- **xAI down**: every call falls through to GitHub Models GPT-4.1-mini transparently
+- **xAI down**: every call falls through to GitHub Models GPT-4.1-nano transparently
 - **Both LLM providers down**: query gen / triage return empty; if both triage calls fail the digest is skipped and state is still persisted
 - **Triage hangs**: each future is bounded by `2 * LLM_TIMEOUT_SEC + 10` seconds so the workflow doesn't sit until the 10‑minute job timeout
 - **Enrichment fetch/LLM failure**: per-item and best-effort; the digest ships with the triage-time why/action
