@@ -38,9 +38,9 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           fetch-depth: 0
-	  token: ${{ secrets.SYNC_TOKEN || github.token }}
+          token: ${{ secrets.SYNC_TOKEN || github.token }}
 
-      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39  # v8.2.0
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
           enable-cache: true
           python-version: '3.12'
@@ -50,7 +50,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-	  git config merge.ours.driver true
+          git config merge.ours.driver true
           git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
           git fetch upstream main
           BEFORE=$(git rev-parse HEAD)
