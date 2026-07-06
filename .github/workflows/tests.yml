@@ -4,9 +4,6 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - 'state.json'
-      - 'kev_cache.json'
-      - 'last_run.txt'
       - 'README.md'
   pull_request:
   workflow_dispatch:

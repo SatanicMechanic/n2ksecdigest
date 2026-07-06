@@ -60,7 +60,13 @@ def _item_card(index: int, item: dict) -> str:
     why = _esc(item.get("why", ""))
     action = _esc(item.get("action", ""))
     url = _safe_url(item.get("url", ""))
-    url_attr = _esc(url)
+    link_html = ""
+    if url != "#":
+        link_html = f"""<a href="{_esc(url)}"
+                 style="font-size:12px; font-family:monospace; color:#38bdf8;
+                        text-decoration:none;">
+                Read more →
+              </a>"""
 
     return f"""
     <tr>
@@ -97,11 +103,7 @@ def _item_card(index: int, item: dict) -> str:
                 {action}
               </p>
 
-              <a href="{url_attr}"
-                 style="font-size:12px; font-family:monospace; color:#38bdf8;
-                        text-decoration:none;">
-                Read more →
-              </a>
+              {link_html}
 
             </td>
           </tr>

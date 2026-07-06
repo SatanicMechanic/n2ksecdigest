@@ -14,7 +14,11 @@ import re
 import io
 import html
 import datetime
+import ipaddress
 import os
+import socket
+from urllib.parse import urlsplit, urljoin
+
 import feedparser
 import requests
 
@@ -329,6 +333,7 @@ def fetch_search_articles(query_specs: list[dict], lookback_hours: int,
     seen_in_search: set[str] = set()
     out: list[dict] = []
     total_brave = 0
+    excl_invalid = 0
     excl_rss_dedup = 0
     excl_state = 0
     excl_blocklist = 0
@@ -341,7 +346,7 @@ def fetch_search_articles(query_specs: list[dict], lookback_hours: int,
             total_brave += 1
             norm = normalize_url(r["link"])
             if not norm:
-                excl_rss_dedup += 1
+                excl_invalid += 1
                 continue
             if norm in rss_norm_urls or norm in seen_in_search:
                 excl_rss_dedup += 1
@@ -359,8 +364,8 @@ def fetch_search_articles(query_specs: list[dict], lookback_hours: int,
 
     stats = {
         "fetched": total_brave,
-        "after_rss_dedup": total_brave - excl_rss_dedup,
-        "after_state_dedup": total_brave - excl_rss_dedup - excl_state,
+        "after_rss_dedup": total_brave - excl_invalid - excl_rss_dedup,
+        "after_state_dedup": total_brave - excl_invalid - excl_rss_dedup - excl_state,
         "after_blocklist": len(out),
     }
     print(f"Search returned {len(out)} unique new articles.")
@@ -383,31 +388,73 @@ ARTICLE_TEXT_MAX_CHARS = 4000
 _ARTICLE_FETCH_MAX_BYTES = 1_000_000  # don't slurp unbounded responses
 
 
+_ARTICLE_FETCH_MAX_REDIRECTS = 5
+
+
+def _is_public_host(host: str) -> bool:
+    """True if every address the host resolves to is globally routable.
+
+    SSRF guard: the article URL originates in LLM output (influenced by
+    untrusted article content), and the fetch runs on infrastructure with a
+    metadata endpoint (169.254.169.254). Rejecting private/loopback/link-local
+    targets closes that off.
+    """
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except (socket.gaierror, UnicodeError):
+        return False
+    if not infos:
+        return False
+    try:
+        return all(ipaddress.ip_address(info[4][0]).is_global for info in infos)
+    except ValueError:
+        return False
+
+
 def fetch_article_text(url: str, max_chars: int = ARTICLE_TEXT_MAX_CHARS) -> str:
     """Fetch a selected article and return plain text (best-effort).
 
     The URL comes from LLM triage output, which echoes candidate-pool URLs but
-    is still model output — enforce http(s) before fetching. Content is
-    untrusted web data; the enrichment prompt's trust boundary handles that.
+    is still model output — enforce http(s) and a public-address host before
+    fetching. Redirects are followed manually so every hop gets the same
+    checks (a public host could otherwise redirect to the metadata endpoint).
+    Content is untrusted web data; the enrichment prompt's trust boundary
+    handles that.
     """
-    if not url or not url.lower().startswith(("http://", "https://")):
-        return ""
+    # ponytail: host check is resolve-then-fetch, so a DNS-rebinding server
+    # could still slip through; pin the resolved IP at connect time if that
+    # ever matters here.
     try:
-        resp = requests.get(
-            url,
-            headers={"User-Agent": HTTP_USER_AGENT},
-            timeout=FEED_FETCH_TIMEOUT_SEC,
-            stream=True,
-        )
-        if resp.status_code != 200:
-            return ""
-        content_type = resp.headers.get("Content-Type", "")
-        if "html" not in content_type and "text" not in content_type:
-            return ""
-        raw = resp.raw.read(_ARTICLE_FETCH_MAX_BYTES, decode_content=True)
-        body = raw.decode(resp.encoding or "utf-8", errors="replace")
+        for _ in range(_ARTICLE_FETCH_MAX_REDIRECTS + 1):
+            if not url or not url.lower().startswith(("http://", "https://")):
+                return ""
+            host = urlsplit(url).hostname
+            if not host or not _is_public_host(host):
+                print(f"Article fetch blocked (non-public host): {url}")
+                return ""
+            resp = requests.get(
+                url,
+                headers={"User-Agent": HTTP_USER_AGENT},
+                timeout=FEED_FETCH_TIMEOUT_SEC,
+                stream=True,
+                allow_redirects=False,
+            )
+            if resp.is_redirect or resp.is_permanent_redirect:
+                location = resp.headers.get("Location", "")
+                if not location:
+                    return ""
+                url = urljoin(url, location)
+                continue
+            if resp.status_code != 200:
+                return ""
+            content_type = resp.headers.get("Content-Type", "")
+            if "html" not in content_type and "text" not in content_type:
+                return ""
+            raw = resp.raw.read(_ARTICLE_FETCH_MAX_BYTES, decode_content=True)
+            body = raw.decode(resp.encoding or "utf-8", errors="replace")
+            body = _SCRIPT_STYLE_RE.sub(" ", body)
+            return _strip_html(body)[:max_chars]
+        return ""  # redirect loop exceeded
     except (requests.RequestException, ValueError) as exc:
         print(f"Article fetch failed for {url}: {exc}")
         return ""
-    body = _SCRIPT_STYLE_RE.sub(" ", body)
-    return _strip_html(body)[:max_chars]

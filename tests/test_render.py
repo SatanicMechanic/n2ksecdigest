@@ -52,7 +52,9 @@ def test_javascript_url_does_not_leak_into_html():
     }]
     out = render_html(items, "Apr 15, 2026")
     assert "javascript:" not in out
-    assert 'href="#"' in out
+    # Rejected URL: no link is rendered at all.
+    assert "href=" not in out
+    assert "Read more" not in out
 
 
 def test_render_text_basic():

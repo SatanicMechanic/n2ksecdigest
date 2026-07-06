@@ -353,8 +353,19 @@ def run() -> None:
         save_state(state)
         return
 
-    items_threat = parse_triage_output(raw_threat) if raw_threat else None
-    items_tooling = parse_triage_output(raw_tooling) if raw_tooling else None
+    # Parse each call independently: bad JSON from one must not discard the
+    # other's good output or crash the run before save_state.
+    def _safe_parse(raw: str, label: str):
+        if not raw:
+            return None
+        try:
+            return parse_triage_output(raw)
+        except RuntimeError as exc:
+            print(f"{label} triage output unusable: {exc}")
+            return None
+
+    items_threat = _safe_parse(raw_threat, "Threat")
+    items_tooling = _safe_parse(raw_tooling, "Tooling")
 
     items = _merge_triage_results(items_threat, items_tooling)
     if not items:

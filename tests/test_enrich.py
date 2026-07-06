@@ -25,11 +25,22 @@ class _FakeRaw:
 
 class _FakeResp:
     def __init__(self, body: str, status_code: int = 200,
-                 content_type: str = "text/html; charset=utf-8"):
+                 content_type: str = "text/html; charset=utf-8",
+                 location: str = ""):
         self.status_code = status_code
         self.headers = {"Content-Type": content_type}
+        if location:
+            self.headers["Location"] = location
+        self.is_redirect = status_code in (302, 303, 307)
+        self.is_permanent_redirect = status_code in (301, 308)
         self.encoding = "utf-8"
         self.raw = _FakeRaw(body.encode("utf-8"))
+
+
+def _allow_all_hosts(monkeypatch):
+    # fetch_article_text resolves hostnames for its SSRF guard; tests must not
+    # depend on real DNS.
+    monkeypatch.setattr(fetchers, "_is_public_host", lambda host: True)
 
 
 def test_fetch_article_text_rejects_non_http_schemes():
@@ -40,6 +51,7 @@ def test_fetch_article_text_rejects_non_http_schemes():
 
 
 def test_fetch_article_text_strips_script_and_style(monkeypatch):
+    _allow_all_hosts(monkeypatch)
     body = (
         "<html><head><style>body{color:red}</style>"
         "<script>steal()</script></head>"
@@ -52,6 +64,7 @@ def test_fetch_article_text_strips_script_and_style(monkeypatch):
 
 
 def test_fetch_article_text_non_html_content_type_returns_empty(monkeypatch):
+    _allow_all_hosts(monkeypatch)
     monkeypatch.setattr(
         fetchers.requests, "get",
         lambda *a, **k: _FakeResp("binary", content_type="application/pdf"))
@@ -59,16 +72,60 @@ def test_fetch_article_text_non_html_content_type_returns_empty(monkeypatch):
 
 
 def test_fetch_article_text_non_200_returns_empty(monkeypatch):
+    _allow_all_hosts(monkeypatch)
     monkeypatch.setattr(fetchers.requests, "get",
                         lambda *a, **k: _FakeResp("nope", status_code=404))
     assert fetchers.fetch_article_text("https://example.com/gone") == ""
 
 
 def test_fetch_article_text_respects_max_chars(monkeypatch):
+    _allow_all_hosts(monkeypatch)
     monkeypatch.setattr(fetchers.requests, "get",
                         lambda *a, **k: _FakeResp("<p>" + "x" * 9000 + "</p>"))
     out = fetchers.fetch_article_text("https://example.com/long", max_chars=100)
     assert len(out) == 100
+
+
+def test_fetch_article_text_blocks_non_public_host(monkeypatch):
+    monkeypatch.setattr(fetchers, "_is_public_host", lambda host: False)
+    monkeypatch.setattr(
+        fetchers.requests, "get",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not fetch")))
+    assert fetchers.fetch_article_text("https://169.254.169.254/metadata") == ""
+
+
+def test_fetch_article_text_checks_host_on_every_redirect_hop(monkeypatch):
+    # Public host redirecting to a non-public one must be blocked at the hop.
+    monkeypatch.setattr(fetchers, "_is_public_host",
+                        lambda host: host == "example.com")
+    calls = []
+
+    def fake_get(url, *a, **k):
+        calls.append(url)
+        return _FakeResp("", status_code=302,
+                         location="http://169.254.169.254/metadata")
+
+    monkeypatch.setattr(fetchers.requests, "get", fake_get)
+    assert fetchers.fetch_article_text("https://example.com/story") == ""
+    assert calls == ["https://example.com/story"]
+
+
+def test_fetch_article_text_follows_public_redirect(monkeypatch):
+    _allow_all_hosts(monkeypatch)
+    resps = [
+        _FakeResp("", status_code=301, location="https://example.com/final"),
+        _FakeResp("<p>Landed.</p>"),
+    ]
+    monkeypatch.setattr(fetchers.requests, "get",
+                        lambda *a, **k: resps.pop(0))
+    assert fetchers.fetch_article_text("https://example.com/story") == "Landed."
+
+
+def test_is_public_host_rejects_private_addresses():
+    # Literal IPs resolve without DNS, so these run fine offline.
+    assert fetchers._is_public_host("169.254.169.254") is False
+    assert fetchers._is_public_host("127.0.0.1") is False
+    assert fetchers._is_public_host("10.0.0.5") is False
 
 
 # --- enrich_items ---
