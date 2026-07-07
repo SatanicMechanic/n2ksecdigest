@@ -14,7 +14,6 @@ Pipeline:
 import os
 import datetime
 import concurrent.futures
-from collections import Counter
 from dotenv import load_dotenv
 
 from llm import (
@@ -34,17 +33,14 @@ from config import (
 from fetchers import fetch_rss_articles, fetch_search_articles
 from state import load_state, save_state, record_candidates, record_sent, recent_sent_headlines, sent_today
 from render import render_html, render_text, subject_line
-from mailer import send_email, send_skip_report  # TEMPORARY: send_skip_report
+from mailer import send_email
 
 load_dotenv()
 
 
 # Required env vars: the run cannot send a digest without these.
-# Optional env vars: degrade gracefully but worth surfacing if absent so a
-# misconfigured deploy is obvious in the logs.
 _REQUIRED_ENV = ("XAI_API_KEY", "GH_MODELS_TOKEN", "RESEND_API_KEY",
                  "DIGEST_TO_EMAIL", "DIGEST_FROM_EMAIL")
-_OPTIONAL_ENV = ("BRAVE_API_KEY",)
 
 
 def _check_env() -> None:
@@ -54,9 +50,8 @@ def _check_env() -> None:
             f"Missing required environment variable(s): {', '.join(missing)}. "
             f"See .env.example for the full list."
         )
-    for name in _OPTIONAL_ENV:
-        if not os.environ.get(name):
-            print(f"Warning: optional env var {name} is unset; related pipeline stage will be a no-op.")
+    if not os.environ.get("BRAVE_API_KEY"):
+        print("Warning: BRAVE_API_KEY is unset; web search stage will be a no-op.")
 
 
 def _load_prompt(filename: str, today_str: str, lookback_hours: int) -> str:
@@ -97,64 +92,6 @@ def _merge_triage_results(items_a, items_b) -> list:
 def get_lookback_hours() -> int:
     """72 hours on Monday (covers the weekend), 24 hours otherwise."""
     return 72 if datetime.date.today().weekday() == 0 else 24
-
-
-# TEMPORARY: SKIP-transparency report. Single call site below in run(); the
-# helper builds a plain-text dump of rejected candidates + raw LLM output and
-# hands it to mailer.send_skip_report. Remove this function and its call site
-# together when no longer needed.
-def _send_skip_debug(today_str: str, lookback_hours: int,
-                     all_articles: list[dict], pool_summary: str,
-                     raw_threat: str, raw_tooling: str) -> None:
-    # Per-query-type tally of rejected candidates. Every candidate in a SKIP
-    # report was rejected this run, so this shows which query type contributed
-    # the most pool noise — the evidence for which generator to retune next.
-    tally = Counter(a.get("query_type") or "rss" for a in all_articles)
-    tally_lines = [
-        f"  {label}: {count}"
-        for label, count in sorted(tally.items(), key=lambda kv: (-kv[1], kv[0]))
-    ]
-
-    lines = [
-        f"SKIP report — {today_str}",
-        f"Lookback: {lookback_hours}h",
-        "",
-        pool_summary.rstrip(),
-        "",
-        "=== REJECTED CANDIDATES BY SOURCE/QUERY TYPE ===",
-        *tally_lines,
-        "",
-        "=== THREAT LLM OUTPUT ===",
-        raw_threat or "(empty / call failed)",
-        "",
-        "=== TOOLING LLM OUTPUT ===",
-        raw_tooling or "(empty / call failed)",
-        "",
-        f"=== {len(all_articles)} CANDIDATES (rejected) ===",
-        "",
-    ]
-    for i, a in enumerate(all_articles, 1):
-        source_str = a["source"]
-        also = a.get("also_sources") or []
-        if also:
-            source_str += f" (also: {', '.join(also)})"
-        lines.append(f"{i}. [{source_str}] {a['title']}")
-        lines.append(f"   {a['link']}")
-        lines.append(f"   Published: {a['published']}")
-        # Attribution: which search query surfaced this candidate (web search
-        # only; RSS items have no query). Makes a noisy pool diagnosable.
-        qtype = a.get("query_type")
-        if qtype:
-            lines.append(f"   Query: [{qtype}] {a.get('query', '')}")
-        summary = (a.get("summary") or "").strip()
-        if summary:
-            lines.append(f"   Summary: {summary}")
-        lines.append("")
-    body = "\n".join(lines)
-    try:
-        send_skip_report(f"[skip-debug] {today_str} ({lookback_hours}h)", body)
-    except Exception as exc:
-        print(f"SKIP debug report failed (continuing): {exc}")
 
 
 def run() -> None:
@@ -370,10 +307,6 @@ def run() -> None:
     items = _merge_triage_results(items_threat, items_tooling)
     if not items:
         print("Nothing noteworthy today (SKIP). Persisting state and exiting.")
-        # TEMPORARY: deliver a SKIP-transparency report so rejected candidates
-        # are visible. Remove when no longer needed.
-        _send_skip_debug(today_str, lookback_hours, all_articles, pool_summary,
-                         raw_threat, raw_tooling)
         save_state(state)
         return
 

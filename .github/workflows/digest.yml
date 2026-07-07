@@ -49,7 +49,6 @@ jobs:
           RESEND_API_KEY:    ${{ secrets.RESEND_API_KEY }}
           DIGEST_TO_EMAIL:   ${{ vars.DIGEST_TO_EMAIL }}
           DIGEST_FROM_EMAIL: ${{ vars.DIGEST_FROM_EMAIL }}
-          SKIP_REPORT_TO_EMAIL: ${{ vars.SKIP_REPORT_TO_EMAIL }}
           BRAVE_API_KEY:     ${{ secrets.BRAVE_API_KEY }}
           BRAVE_GOGGLES:     ${{ vars.BRAVE_GOGGLES }}
         run: uv run python digest.py

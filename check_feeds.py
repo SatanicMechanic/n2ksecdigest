@@ -11,6 +11,7 @@ import feedparser
 import requests
 
 from config import FEEDS, FEED_FETCH_TIMEOUT_SEC, HTTP_USER_AGENT
+from fetchers import entry_published
 
 LOOKBACK_HOURS = 72
 
@@ -41,15 +42,7 @@ def check_feeds() -> bool:
         total = len(feed.entries)
         recent = 0
         for entry in feed.entries:
-            published = None
-            for field in ("published_parsed", "updated_parsed"):
-                parsed = getattr(entry, field, None)
-                if parsed:
-                    try:
-                        published = datetime.datetime(*parsed[:6], tzinfo=datetime.timezone.utc)
-                    except (TypeError, ValueError):
-                        pass
-                    break
+            published = entry_published(entry)
             if published and published >= cutoff:
                 recent += 1
 

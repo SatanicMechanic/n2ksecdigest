@@ -140,7 +140,7 @@ If `stack.txt` is missing or empty the bot exits with an error rather than silen
 ### 4. Repo secrets + variables (for Actions)
 
 **Secrets:** `XAI_API_KEY`, `GH_MODELS_TOKEN`, `RESEND_API_KEY`, `BRAVE_API_KEY`
-**Variables:** `DIGEST_TO_EMAIL`, `DIGEST_FROM_EMAIL`, `SKIP_REPORT_TO_EMAIL` (optional — recipient for a plain-text dump of rejected candidates on SKIP runs; unset disables it)
+**Variables:** `DIGEST_TO_EMAIL`, `DIGEST_FROM_EMAIL`
 
 `GH_MODELS_TOKEN` must be a fine-grained PAT with `models:read` — Actions' built-in `GITHUB_TOKEN` does not have that scope.
 

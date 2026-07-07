@@ -79,8 +79,8 @@ def _is_blocked(article: dict) -> bool:
             if pattern.search(link_lower):
                 return True
         try:
-            host = (requests.utils.urlparse(link_lower).hostname) or ""
-        except Exception:
+            host = urlsplit(link_lower).hostname or ""
+        except ValueError:
             host = ""
         for domain in BLOCKLIST_DOMAINS:
             d = domain.lower()
@@ -110,6 +110,19 @@ def _fetch_feed_bytes(url: str) -> bytes | None:
         return None
 
 
+def entry_published(entry) -> datetime.datetime | None:
+    """UTC publish time from a feedparser entry, or None if unparseable."""
+    for field in ("published_parsed", "updated_parsed"):
+        parsed = getattr(entry, field, None)
+        if parsed:
+            try:
+                return datetime.datetime(*parsed[:6], tzinfo=datetime.timezone.utc)
+            except (TypeError, ValueError):
+                pass
+            break
+    return None
+
+
 def _parse_one_feed(url: str, cutoff: datetime.datetime) -> list[dict]:
     raw = _fetch_feed_bytes(url)
     if raw is None:
@@ -118,15 +131,7 @@ def _parse_one_feed(url: str, cutoff: datetime.datetime) -> list[dict]:
     out: list[dict] = []
     seen_titles_in_feed: set[str] = set()
     for entry in feed.entries:
-        published = None
-        for field in ("published_parsed", "updated_parsed"):
-            parsed = getattr(entry, field, None)
-            if parsed:
-                try:
-                    published = datetime.datetime(*parsed[:6], tzinfo=datetime.timezone.utc)
-                except (TypeError, ValueError):
-                    pass
-                break
+        published = entry_published(entry)
 
         if published and published < cutoff:
             continue

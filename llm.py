@@ -9,9 +9,6 @@ import json
 import datetime
 
 from openai import OpenAI
-from azure.ai.inference import ChatCompletionsClient
-from azure.ai.inference.models import SystemMessage, UserMessage
-from azure.core.credentials import AzureKeyCredential
 
 from config import (
     GITHUB_MODELS_BASE_URL, XAI_BASE_URL, XAI_MODEL, FALLBACK_MODEL,
@@ -79,22 +76,23 @@ def call_xai(system_prompt: str, user_message: str,
 def call_github_models(system_prompt: str, user_message: str,
                        temperature: float = 0.15,
                        json_mode: bool = False) -> str:
-    """Call GitHub Models (fallback) via the Azure AI Inference SDK."""
-    client = ChatCompletionsClient(
-        endpoint=GITHUB_MODELS_BASE_URL,
-        credential=AzureKeyCredential(os.environ["GH_MODELS_TOKEN"]),
+    """Call GitHub Models (fallback) via its OpenAI-compatible endpoint."""
+    client = OpenAI(
+        api_key=os.environ["GH_MODELS_TOKEN"],
+        base_url=GITHUB_MODELS_BASE_URL,
+        timeout=LLM_TIMEOUT_SEC,
     )
     kwargs: dict = {
         "model": FALLBACK_MODEL,
         "temperature": temperature,
         "messages": [
-            SystemMessage(system_prompt),
-            UserMessage(user_message),
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
         ],
     }
     if json_mode:
-        kwargs["response_format"] = "json_object"
-    response = client.complete(**kwargs)
+        kwargs["response_format"] = {"type": "json_object"}
+    response = client.chat.completions.create(**kwargs)
     return response.choices[0].message.content.strip()
 
 

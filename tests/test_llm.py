@@ -265,14 +265,6 @@ def _make_mock_openai_client(content="result"):
     return mock_client
 
 
-def _make_mock_azure_client(content="result"):
-    mock_response = mock.MagicMock()
-    mock_response.choices[0].message.content = content
-    mock_client = mock.MagicMock()
-    mock_client.complete.return_value = mock_response
-    return mock_client
-
-
 def test_call_xai_succeeds(monkeypatch):
     monkeypatch.setenv("XAI_API_KEY", "tok")
     mock_client = _make_mock_openai_client("result")
@@ -300,41 +292,41 @@ def test_call_xai_sets_json_mode(monkeypatch):
     assert kwargs.get("response_format") == {"type": "json_object"}
 
 
-# --- call_github_models (Azure AI Inference SDK fallback) ---
+# --- call_github_models (OpenAI-compatible fallback) ---
 
 def test_call_github_models_succeeds(monkeypatch):
     monkeypatch.setenv("GH_MODELS_TOKEN", "tok")
-    mock_client = _make_mock_azure_client("result")
-    with mock.patch("llm.ChatCompletionsClient", return_value=mock_client):
+    mock_client = _make_mock_openai_client("result")
+    with mock.patch("llm.OpenAI", return_value=mock_client):
         result = llm.call_github_models("sys", "user")
     assert result == "result"
-    mock_client.complete.assert_called_once()
+    mock_client.chat.completions.create.assert_called_once()
 
 
 def test_call_github_models_uses_pat_env_var(monkeypatch):
     monkeypatch.setenv("GH_MODELS_TOKEN", "my-pat")
-    mock_client = _make_mock_azure_client()
-    with mock.patch("llm.ChatCompletionsClient", return_value=mock_client), \
-         mock.patch("llm.AzureKeyCredential") as mock_cred:
+    mock_client = _make_mock_openai_client()
+    with mock.patch("llm.OpenAI", return_value=mock_client) as mock_openai:
         llm.call_github_models("sys", "user")
-    mock_cred.assert_called_once_with("my-pat")
+    _, kwargs = mock_openai.call_args
+    assert kwargs.get("api_key") == "my-pat"
 
 
 def test_call_github_models_sets_json_mode(monkeypatch):
     monkeypatch.setenv("GH_MODELS_TOKEN", "tok")
-    mock_client = _make_mock_azure_client()
-    with mock.patch("llm.ChatCompletionsClient", return_value=mock_client):
+    mock_client = _make_mock_openai_client()
+    with mock.patch("llm.OpenAI", return_value=mock_client):
         llm.call_github_models("sys", "user", json_mode=True)
-    _, kwargs = mock_client.complete.call_args
-    assert kwargs.get("response_format") == "json_object"
+    _, kwargs = mock_client.chat.completions.create.call_args
+    assert kwargs.get("response_format") == {"type": "json_object"}
 
 
 def test_call_github_models_no_json_mode_by_default(monkeypatch):
     monkeypatch.setenv("GH_MODELS_TOKEN", "tok")
-    mock_client = _make_mock_azure_client()
-    with mock.patch("llm.ChatCompletionsClient", return_value=mock_client):
+    mock_client = _make_mock_openai_client()
+    with mock.patch("llm.OpenAI", return_value=mock_client):
         llm.call_github_models("sys", "user")
-    _, kwargs = mock_client.complete.call_args
+    _, kwargs = mock_client.chat.completions.create.call_args
     assert "response_format" not in kwargs
 
 
@@ -351,8 +343,7 @@ def test_call_llm_uses_xai_primary(monkeypatch):
 def test_call_llm_falls_back_on_xai_failure(monkeypatch):
     monkeypatch.setenv("XAI_API_KEY", "tok")
     monkeypatch.setenv("GH_MODELS_TOKEN", "tok")
-    mock_azure = _make_mock_azure_client("from-fallback")
-    with mock.patch("llm.OpenAI", side_effect=Exception("xai down")), \
-         mock.patch("llm.ChatCompletionsClient", return_value=mock_azure):
+    with mock.patch.object(llm, "call_xai", side_effect=Exception("xai down")), \
+         mock.patch.object(llm, "call_github_models", return_value="from-fallback"):
         result = llm.call_llm("sys", "user")
     assert result == "from-fallback"
