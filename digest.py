@@ -34,6 +34,7 @@ from fetchers import fetch_rss_articles, fetch_search_articles
 from state import load_state, save_state, record_candidates, record_sent, recent_sent_headlines, sent_today
 from render import render_html, render_text, subject_line
 from mailer import send_email
+from slack import send_slack
 
 load_dotenv()
 
@@ -326,6 +327,7 @@ def run() -> None:
     text_body = render_text(items, today_str)
     subject = subject_line(items, today_str)
     send_email(html_body, text_body, subject)
+    send_slack(text_body)
 
     # --- Promote sent URLs (longer TTL) and persist ---
     sent_count = 0

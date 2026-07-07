@@ -61,7 +61,8 @@ This bot is complementary to — not a replacement for — weekly digests like [
 │                      back to triage-time fields on any failure           │
 │                                                                          │
 │  6. Render + send    HTML (escaped) + plain-text body, severity-aware    │
-│                      subject line, delivered via Resend                  │
+│                      subject line, delivered via Resend (+ optional      │
+│                      Slack webhook)                                      │
 │                                                                          │
 │  7. Persist state    sent URLs → 30-day suppression                      │
 │                      candidate URLs → 5-day cooldown                     │
@@ -79,6 +80,7 @@ This bot is complementary to — not a replacement for — weekly digests like [
 | `llm.py`         | xAI primary + GitHub Models fallback clients, query gen, triage parsing |
 | `render.py`      | HTML (escaped) + plain-text rendering, subject line |
 | `mailer.py`      | Resend delivery |
+| `slack.py`       | Optional Slack webhook notification |
 | `prompt_threat.txt` | Threat/compliance triage prompt (fire-tier bar) |
 | `prompt_tooling.txt` | Tooling triage prompt (platform/CI/CD/OSS-tool bar) |
 | `prompt_slow_queries.txt` | Compliance + PQC query-generation prompt |
@@ -114,6 +116,7 @@ Copy `.env.example` → `.env` and fill in:
 | `DIGEST_TO_EMAIL`   | Comma-separated recipient list | Yes |
 | `DIGEST_FROM_EMAIL` | Verified domain in Resend | Yes |
 | `BRAVE_API_KEY`     | Brave Search API (free tier: 2K queries/month) | **Strongly recommended** — without it the web-search pass is a no-op |
+| `SLACK_WEBHOOK_URL` | Slack app's [Incoming Webhooks](https://api.slack.com/messaging/webhooks) page | No — when set, the plain-text digest is also posted to that channel; unset = Slack step is a no-op |
 
 ### 3. Stack description (and why you want a private fork)
 
@@ -213,6 +216,7 @@ Almost free at current usage:
 - **Triage hangs**: each future is bounded by `2 * LLM_TIMEOUT_SEC + 10` seconds so the workflow doesn't sit until the 10‑minute job timeout
 - **Enrichment fetch/LLM failure**: per-item and best-effort; the digest ships with the triage-time why/action
 - **Resend 4xx/5xx**: raises; state is not updated, so the next run will re-consider the same articles
+- **Slack webhook down / URL missing**: logged and ignored; email delivery (the delivery of record) is unaffected
 
 ## Operational notes
 
