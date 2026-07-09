@@ -96,7 +96,7 @@ BLOCKLIST_URL_PATTERNS: list[str] = [
 
 GITHUB_MODELS_BASE_URL = "https://models.github.ai/inference"
 XAI_BASE_URL = "https://api.x.ai/v1"
-XAI_MODEL = "grok-4.3"                  # primary model (all calls)
+XAI_MODEL = "grok-4.5"                  # primary model (all calls)
 FALLBACK_MODEL = "openai/gpt-4.1-nano"  # GitHub Models fallback (all calls)
 # nano over mini: GitHub Models free-tier budgets can 403 ("budget limit
 # reached") on mini/4o-class models partway through a billing cycle; nano is

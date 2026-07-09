@@ -1,4 +1,4 @@
-"""Quick smoke test for xAI (grok-4.3) and GitHub Models fallback.
+"""Quick smoke test for xAI (grok-4.5) and GitHub Models fallback.
 
 Manual: hits the real APIs. Filename is intentionally not `test_*.py` so
 pytest's auto-collection skips it; run it directly when you want to verify

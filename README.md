@@ -1,6 +1,6 @@
 # n2ksecdigest
 
-Automated product-security news digest. Runs on GitHub Actions twice each weekday, fetches from RSS and web search, triages through xAI Grok-4.3 (with GitHub Models GPT-4.1-nano as fallback) against a **news-cycle fire-tier bar**, and emails a short digest via Resend.
+Automated product-security news digest. Runs on GitHub Actions twice each weekday, fetches from RSS and web search, triages through xAI Grok-4.5 (with GitHub Models GPT-4.1-nano as fallback) against a **news-cycle fire-tier bar**, and emails a short digest via Resend.
 
 ## Should you actually use this?
 
@@ -104,9 +104,9 @@ source .venv/bin/activate
 uv pip install -r requirements.txt -r requirements-dev.txt
 ```
 
-### 2. Environment
+### 2. Environment (local runs only)
 
-Copy `.env.example` → `.env` and fill in:
+Copy `.env.example` → `.env` and fill in the values below. This file is for running on your machine — CI reads the same values from repo secrets/variables (§4), never from `.env`.
 
 | Variable            | Source | Required? |
 |---------------------|--------|-----------|
@@ -198,9 +198,9 @@ The cache save step runs with `if: always()` so state is preserved even when the
 
 ## Costs
 
-Almost free at current usage:
+Almost free at current usage — roughly $0.60/month total:
 
-- xAI Grok-4.3 (primary): paid per-token, but volume is small — 5–6 query/triage calls per run (anchored query when warranted, independent query, combined compliance+PQC query, tooling-scan, ai-lab, threat + tooling triage in parallel; ~25K tokens), plus up to 3 short enrichment calls on days when items are actually selected (most days: zero). Reasoning effort is pinned to "low" — enough judgment for triage-style calls without deep-reasoning latency or cost.
+- xAI Grok-4.5 (primary): paid per-token, but volume is small — 5–6 query/triage calls per run (anchored query when warranted, independent query, combined compliance+PQC query, tooling-scan, ai-lab, threat + tooling triage in parallel; ~25K tokens), plus up to 3 short enrichment calls on days when items are actually selected (most days: zero). Reasoning effort is pinned to "low" — enough judgment for triage-style calls without deep-reasoning latency or cost.
 - GitHub Models GPT-4.1-nano (fallback): free tier, only used when the xAI call fails (nano because free-tier budgets can exhaust mid-cycle on mini-class models).
 - GitHub Actions: ~1 min/run, well within free tier
 - Brave Search: 2,000 queries/month free; this bot uses ~160/month (8 queries/run × ~20 runs)
