@@ -2,10 +2,10 @@ name: Need to Know
 
 on:
   schedule:
-    # 11:00 UTC = 04:00 PDT (UTC-7) / 03:00 PST (UTC-8), weekdays only
-    - cron: '7 11 * * 1-5'
-    # 23:00 UTC = 16:00 PDT / 15:00 PST — catches breaking news; skips if morning already sent
-    - cron: '7 23 * * 1-5'
+    # 10:55 UTC = 03:55 PDT (UTC-7) / 02:55 PST (UTC-8), weekdays only
+    - cron: '55 10 * * 1-5'
+    # 22:55 UTC = 15:55 PDT / 14:55 PST — catches breaking news; skips if morning already sent
+    - cron: '55 22 * * 1-5'
   workflow_dispatch:
 
 permissions:
