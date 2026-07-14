@@ -257,85 +257,96 @@ def test_generate_ai_lab_queries_caps_to_configured_count(monkeypatch):
 
 # --- call_xai ---
 
-def _make_mock_openai_client(content="result"):
+def _make_mock_post(content="result"):
     mock_response = mock.MagicMock()
-    mock_response.choices[0].message.content = content
-    mock_client = mock.MagicMock()
-    mock_client.chat.completions.create.return_value = mock_response
-    return mock_client
+    mock_response.json.return_value = {
+        "choices": [{"message": {"content": content}}]
+    }
+    return mock.MagicMock(return_value=mock_response)
+
+
+def _post_payload(mock_post):
+    _, kwargs = mock_post.call_args
+    return kwargs["json"]
 
 
 def test_call_xai_succeeds(monkeypatch):
     monkeypatch.setenv("XAI_API_KEY", "tok")
-    mock_client = _make_mock_openai_client("result")
-    with mock.patch("llm.OpenAI", return_value=mock_client):
+    mock_post = _make_mock_post("result")
+    with mock.patch("llm.requests.post", mock_post):
         result = llm.call_xai("sys", "user")
     assert result == "result"
-    mock_client.chat.completions.create.assert_called_once()
+    mock_post.assert_called_once()
 
 
 def test_call_xai_sets_reasoning_effort_low(monkeypatch):
     monkeypatch.setenv("XAI_API_KEY", "tok")
-    mock_client = _make_mock_openai_client()
-    with mock.patch("llm.OpenAI", return_value=mock_client):
+    mock_post = _make_mock_post()
+    with mock.patch("llm.requests.post", mock_post):
         llm.call_xai("sys", "user")
-    _, kwargs = mock_client.chat.completions.create.call_args
-    assert kwargs.get("reasoning_effort") == "low"
+    assert _post_payload(mock_post).get("reasoning_effort") == "low"
 
 
 def test_call_xai_sets_json_mode(monkeypatch):
     monkeypatch.setenv("XAI_API_KEY", "tok")
-    mock_client = _make_mock_openai_client()
-    with mock.patch("llm.OpenAI", return_value=mock_client):
+    mock_post = _make_mock_post()
+    with mock.patch("llm.requests.post", mock_post):
         llm.call_xai("sys", "user", json_mode=True)
-    _, kwargs = mock_client.chat.completions.create.call_args
-    assert kwargs.get("response_format") == {"type": "json_object"}
+    assert _post_payload(mock_post).get("response_format") == {"type": "json_object"}
 
 
 # --- call_github_models (OpenAI-compatible fallback) ---
 
 def test_call_github_models_succeeds(monkeypatch):
     monkeypatch.setenv("GH_MODELS_TOKEN", "tok")
-    mock_client = _make_mock_openai_client("result")
-    with mock.patch("llm.OpenAI", return_value=mock_client):
+    mock_post = _make_mock_post("result")
+    with mock.patch("llm.requests.post", mock_post):
         result = llm.call_github_models("sys", "user")
     assert result == "result"
-    mock_client.chat.completions.create.assert_called_once()
+    mock_post.assert_called_once()
 
 
 def test_call_github_models_uses_pat_env_var(monkeypatch):
     monkeypatch.setenv("GH_MODELS_TOKEN", "my-pat")
-    mock_client = _make_mock_openai_client()
-    with mock.patch("llm.OpenAI", return_value=mock_client) as mock_openai:
+    mock_post = _make_mock_post()
+    with mock.patch("llm.requests.post", mock_post):
         llm.call_github_models("sys", "user")
-    _, kwargs = mock_openai.call_args
-    assert kwargs.get("api_key") == "my-pat"
+    _, kwargs = mock_post.call_args
+    assert kwargs["headers"]["Authorization"] == "Bearer my-pat"
 
 
 def test_call_github_models_sets_json_mode(monkeypatch):
     monkeypatch.setenv("GH_MODELS_TOKEN", "tok")
-    mock_client = _make_mock_openai_client()
-    with mock.patch("llm.OpenAI", return_value=mock_client):
+    mock_post = _make_mock_post()
+    with mock.patch("llm.requests.post", mock_post):
         llm.call_github_models("sys", "user", json_mode=True)
-    _, kwargs = mock_client.chat.completions.create.call_args
-    assert kwargs.get("response_format") == {"type": "json_object"}
+    assert _post_payload(mock_post).get("response_format") == {"type": "json_object"}
 
 
 def test_call_github_models_no_json_mode_by_default(monkeypatch):
     monkeypatch.setenv("GH_MODELS_TOKEN", "tok")
-    mock_client = _make_mock_openai_client()
-    with mock.patch("llm.OpenAI", return_value=mock_client):
+    mock_post = _make_mock_post()
+    with mock.patch("llm.requests.post", mock_post):
         llm.call_github_models("sys", "user")
-    _, kwargs = mock_client.chat.completions.create.call_args
-    assert "response_format" not in kwargs
+    assert "response_format" not in _post_payload(mock_post)
+
+
+def test_call_llm_raises_http_error_on_bad_status(monkeypatch):
+    monkeypatch.setenv("XAI_API_KEY", "tok")
+    monkeypatch.setenv("GH_MODELS_TOKEN", "tok")
+    mock_response = mock.MagicMock()
+    mock_response.raise_for_status.side_effect = Exception("HTTP 500")
+    with mock.patch("llm.requests.post", return_value=mock_response), \
+         pytest.raises(Exception):
+        llm.call_xai("sys", "user")
 
 
 # --- call_llm (dispatcher + fallback) ---
 
 def test_call_llm_uses_xai_primary(monkeypatch):
     monkeypatch.setenv("XAI_API_KEY", "tok")
-    mock_client = _make_mock_openai_client("from-xai")
-    with mock.patch("llm.OpenAI", return_value=mock_client):
+    mock_post = _make_mock_post("from-xai")
+    with mock.patch("llm.requests.post", mock_post):
         result = llm.call_llm("sys", "user")
     assert result == "from-xai"
 

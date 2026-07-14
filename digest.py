@@ -28,7 +28,7 @@ from config import (
     COMPLIANCE_QUERIES, PQC_QUERIES, TOOLING_SCAN_QUERIES, AI_LAB_QUERIES,
     TRIAGE_GLOBAL_CAP, TRIAGE_TOOLING_CAP,
     LLM_TIMEOUT_SEC,
-    MAX_SEARCH_RESULTS, BROAD_SEARCH_RESULTS, SLOW_QUERIES_WEEKLY_ONLY,
+    MAX_SEARCH_RESULTS, BROAD_SEARCH_RESULTS,
 )
 from fetchers import fetch_rss_articles, fetch_search_articles
 from state import load_state, save_state, record_candidates, record_sent, recent_sent_headlines, sent_today
@@ -127,11 +127,9 @@ def run() -> None:
         print(f"  [independent] → {q}")
 
     # Compliance + PQC are slow-moving beats with little genuinely new coverage
-    # day-to-day, so daily polling just guarantees backfill noise. Restrict them
-    # to the Monday catch-up run (72h lookback) when SLOW_QUERIES_WEEKLY_ONLY.
-    weekly_run = lookback_hours >= 48
-    run_slow = weekly_run or not SLOW_QUERIES_WEEKLY_ONLY
-    if run_slow:
+    # day-to-day, so daily polling just guarantees backfill noise. Restricted
+    # to the Monday catch-up run (72h lookback).
+    if lookback_hours >= 48:
         print(f"Generating {COMPLIANCE_QUERIES} compliance + {PQC_QUERIES} PQC queries (combined call)...")
         compliance, pqc = generate_slow_queries(lookback_hours)
         for q in compliance:

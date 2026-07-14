@@ -178,7 +178,7 @@ Most signal tuning lives in `config.py`:
 - `MAX_RSS_ARTICLES`, `PER_FEED_CAP` — candidate pool shape (round-robin merge enforces per-feed fairness)
 - `STATE_SENT_TTL_DAYS` (30) — how long sent URLs stay suppressed
 - `STATE_CANDIDATE_COOLDOWN_DAYS` (5) — how long near-misses are filtered to avoid daily recycling
-- `MAX_SEARCH_QUERIES` (6) — anchored (1) + independent (5) fire-tier queries; `COMPLIANCE_QUERIES` (1) and `PQC_QUERIES` (1) are separate and (when `SLOW_QUERIES_WEEKLY_ONLY`) run only on the Monday catch-up
+- `MAX_SEARCH_QUERIES` (6) — anchored (1) + independent (5) fire-tier queries; `COMPLIANCE_QUERIES` (1) and `PQC_QUERIES` (1) are separate and run only on the Monday catch-up
 - `MAX_SEARCH_RESULTS` (5) / `BROAD_SEARCH_RESULTS` (3) — Brave results fetched per query; abstract query types (independent/compliance/PQC) use the smaller count to shrink trending-news backfill
 - `BRAVE_GOGGLES` (env, optional) — URL of a Brave goggle to bias results toward a curated source set. The repo ships `security-news.goggle` (boosts primary security news/advisories, downranks aggregator backfill). Brave fetches the goggle at query time, so the URL must be publicly reachable — **a private fork's own raw URL won't work**; point at this repo's copy (`https://raw.githubusercontent.com/SatanicMechanic/n2ksecdigest/main/security-news.goggle`), or host a customized goggle at any public URL (a public gist works). Because it must be public, keep customizations generic — don't encode stack hints. Boost-only by design; hard exclusions stay in the testable `config.py` blocklists
 - `LLM_TIMEOUT_SEC` (60) — per-provider request budget; the digest gives each parallel triage future twice this plus slack before timing out

@@ -1,14 +1,17 @@
-"""GitHub Models client + query-generation prompts + triage output parser.
+"""LLM clients (OpenAI-compatible endpoints) + query-generation prompts +
+triage output parser.
 
-Uses the OpenAI SDK with built-in retry (max_retries on the client).
-call_github_models is shared by the query-gen passes and the triage call.
+Plain requests against the chat-completions API — the endpoints are
+OpenAI-compatible and we only ever need one blocking call, so the SDK
+(httpx/pydantic tree) isn't worth the dependency. call_llm retries by
+falling back from xAI to GitHub Models on any error.
 """
 
 import os
 import json
 import datetime
 
-from openai import OpenAI
+import requests
 
 from config import (
     GITHUB_MODELS_BASE_URL, XAI_BASE_URL, XAI_MODEL, FALLBACK_MODEL,
@@ -44,56 +47,55 @@ INDEPENDENT_QUERIES = MAX_SEARCH_QUERIES - ANCHORED_QUERIES
 # LLM clients
 # ---------------------------------------------------------------------------
 
+def _chat_completion(base_url: str, api_key: str, model: str,
+                     system_prompt: str, user_message: str,
+                     temperature: float, json_mode: bool,
+                     extra: dict | None = None) -> str:
+    payload: dict = {
+        "model": model,
+        "temperature": temperature,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ],
+        **(extra or {}),
+    }
+    if json_mode:
+        payload["response_format"] = {"type": "json_object"}
+    resp = requests.post(
+        f"{base_url}/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}"},
+        json=payload,
+        timeout=LLM_TIMEOUT_SEC,
+    )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"].strip()
+
+
 def call_xai(system_prompt: str, user_message: str,
              temperature: float = 0.15,
              json_mode: bool = False) -> str:
-    """Call xAI (Grok) via the OpenAI-compatible SDK.
+    """Call xAI (Grok).
 
     `reasoning_effort` is set explicitly — "low" trades some latency/cost
     for better judgment on triage-style calls, and pins us against xAI
     changing the default.
     """
-    client = OpenAI(
-        api_key=os.environ["XAI_API_KEY"],
-        base_url=XAI_BASE_URL,
-        timeout=LLM_TIMEOUT_SEC,
+    return _chat_completion(
+        XAI_BASE_URL, os.environ["XAI_API_KEY"], XAI_MODEL,
+        system_prompt, user_message, temperature, json_mode,
+        extra={"reasoning_effort": "low"},
     )
-    kwargs: dict = {
-        "model": XAI_MODEL,
-        "temperature": temperature,
-        "reasoning_effort": "low",
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ],
-    }
-    if json_mode:
-        kwargs["response_format"] = {"type": "json_object"}
-    response = client.chat.completions.create(**kwargs)
-    return response.choices[0].message.content.strip()
 
 
 def call_github_models(system_prompt: str, user_message: str,
                        temperature: float = 0.15,
                        json_mode: bool = False) -> str:
     """Call GitHub Models (fallback) via its OpenAI-compatible endpoint."""
-    client = OpenAI(
-        api_key=os.environ["GH_MODELS_TOKEN"],
-        base_url=GITHUB_MODELS_BASE_URL,
-        timeout=LLM_TIMEOUT_SEC,
+    return _chat_completion(
+        GITHUB_MODELS_BASE_URL, os.environ["GH_MODELS_TOKEN"], FALLBACK_MODEL,
+        system_prompt, user_message, temperature, json_mode,
     )
-    kwargs: dict = {
-        "model": FALLBACK_MODEL,
-        "temperature": temperature,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ],
-    }
-    if json_mode:
-        kwargs["response_format"] = {"type": "json_object"}
-    response = client.chat.completions.create(**kwargs)
-    return response.choices[0].message.content.strip()
 
 
 def call_llm(system_prompt: str, user_message: str,
@@ -175,6 +177,24 @@ def parse_triage_output(raw: str) -> list[dict] | None:
             print(f"Warning: dropping LLM item missing fields {missing}: "
                   f"{item.get('headline','(no headline)')!r}")
     return clean_items
+
+
+# ---------------------------------------------------------------------------
+# Query generation — shared scaffold
+# ---------------------------------------------------------------------------
+
+def _today_str() -> str:
+    return datetime.date.today().strftime("%B %d, %Y")
+
+
+def _generate_queries(system: str, ask: str, lookback_hours: int, n: int,
+                      temperature: float) -> list[str]:
+    """Common scaffold: date-stamped user message → call_llm → parse → cap."""
+    user = (
+        f"Today is {_today_str()}. Lookback window: last {lookback_hours} hours.\n\n"
+        f"{ask}"
+    )
+    return parse_query_json(call_llm(system, user, temperature=temperature))[:n]
 
 
 # ---------------------------------------------------------------------------
@@ -268,15 +288,13 @@ Rules:
 
 
 def generate_independent_queries(lookback_hours: int) -> list[str]:
-    today = datetime.date.today().strftime("%B %d, %Y")
     system = _INDEPENDENT_QUERY_SYSTEM.replace("{n}", str(INDEPENDENT_QUERIES))
-    user = (
-        f"Today is {today}. Lookback window: last {lookback_hours} hours.\n\n"
+    ask = (
         f"Generate {INDEPENDENT_QUERIES} search queries targeting security events "
         f"that are actively unfolding right now."
     )
-    raw = call_llm(system, user, temperature=0.4)
-    return parse_query_json(raw)[:INDEPENDENT_QUERIES]
+    return _generate_queries(system, ask, lookback_hours,
+                             INDEPENDENT_QUERIES, temperature=0.4)
 
 
 # ---------------------------------------------------------------------------
@@ -300,7 +318,6 @@ def generate_tooling_scan_queries(lookback_hours: int) -> list[str]:
     rather than competing against fire-tier urgency signals. AI lab capability
     releases have their own slot — see generate_ai_lab_queries.
     """
-    today = datetime.date.today().strftime("%B %d, %Y")
     system = f"""You are a product security analyst generating {TOOLING_SCAN_QUERIES} web search
 query to surface notable new security tooling or platform capabilities published
 in the last {lookback_hours} hours.
@@ -335,13 +352,12 @@ one plain natural-language query; recency is handled by the search engine.
 
 Return ONLY a JSON array of exactly {TOOLING_SCAN_QUERIES} query string(s).
 No preamble. No explanation. No markdown fences."""
-    user = (
-        f"Today is {today}. Lookback window: last {lookback_hours} hours.\n\n"
+    ask = (
         f"Generate {TOOLING_SCAN_QUERIES} search query targeting notable new platform "
         f"security capabilities or engineering security write-ups in this window."
     )
-    raw = call_llm(system, user, temperature=0.3)
-    return parse_query_json(raw)[:TOOLING_SCAN_QUERIES]
+    return _generate_queries(system, ask, lookback_hours,
+                             TOOLING_SCAN_QUERIES, temperature=0.3)
 
 
 # ---------------------------------------------------------------------------
@@ -359,7 +375,6 @@ def generate_ai_lab_queries(lookback_hours: int) -> list[str]:
     are listed so the query generator anchors on them rather than producing
     generic "AI security" queries that fail to surface specific releases.
     """
-    today = datetime.date.today().strftime("%B %d, %Y")
     system = f"""You are a product security analyst generating {AI_LAB_QUERIES} web search
 query to surface new SECURITY-RELEVANT capability releases from major AI labs in
 the last {lookback_hours} hours.
@@ -400,13 +415,12 @@ Rules:
 - Do NOT append dates or years — recency is handled by the search engine
 - Return ONLY a JSON array of {AI_LAB_QUERIES} query string(s). No preamble.
   No explanation. No markdown fences."""
-    user = (
-        f"Today is {today}. Lookback window: last {lookback_hours} hours.\n\n"
+    ask = (
         f"Generate {AI_LAB_QUERIES} search query targeting new security-relevant "
         f"capability releases from major AI labs in this window."
     )
-    raw = call_llm(system, user, temperature=0.3)
-    return parse_query_json(raw)[:AI_LAB_QUERIES]
+    return _generate_queries(system, ask, lookback_hours,
+                             AI_LAB_QUERIES, temperature=0.3)
 
 
 def generate_slow_queries(lookback_hours: int) -> tuple[list[str], list[str]]:
@@ -414,9 +428,8 @@ def generate_slow_queries(lookback_hours: int) -> tuple[list[str], list[str]]:
 
     Returns (compliance_queries, pqc_queries). On parse failure, returns ([], []).
     """
-    today = datetime.date.today().strftime("%B %d, %Y")
     user = (
-        f"Today is {today}. Lookback window: last {lookback_hours} hours.\n\n"
+        f"Today is {_today_str()}. Lookback window: last {lookback_hours} hours.\n\n"
         f"Generate exactly {COMPLIANCE_QUERIES} compliance/policy "
         f"and {PQC_QUERIES} post-quantum cryptography queries."
     )

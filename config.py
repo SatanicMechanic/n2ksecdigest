@@ -141,11 +141,6 @@ BROAD_SEARCH_RESULTS = 3
 # allowlist. Left empty by default; no goggle is applied unless configured.
 BRAVE_GOGGLES = os.environ.get("BRAVE_GOGGLES", "").strip()
 
-# Slow-moving beats (compliance, post-quantum crypto) rarely have genuinely new
-# coverage day-to-day, so polling them every run guarantees backfill noise.
-# Restrict them to the Monday catch-up run (the 72h lookback window).
-SLOW_QUERIES_WEEKLY_ONLY = True
-
 # ---------------------------------------------------------------------------
 # HTTP fetch tuning
 # ---------------------------------------------------------------------------
