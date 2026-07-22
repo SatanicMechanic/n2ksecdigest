@@ -1,6 +1,6 @@
 # n2ksecdigest
 
-Automated product-security news digest. Runs on GitHub Actions twice each weekday, fetches from RSS and web search, triages through xAI Grok-4.5 (with GitHub Models GPT-4.1-nano as fallback) against a **news-cycle fire-tier bar**, and emails a short digest via Resend.
+Automated product-security news digest. Runs on GitHub Actions twice each weekday, fetches from RSS and web search, triages through a configurable LLM provider (xAI Grok-4.5 by default, with GitHub Models GPT-4.1-nano as fallback) against a **news-cycle fire-tier bar**, and emails a short digest via Resend.
 
 ## Should you actually use this?
 
@@ -77,7 +77,7 @@ This bot is complementary to — not a replacement for — weekly digests like [
 | `digest.py`      | Orchestrator (entrypoint: `python digest.py`) |
 | `fetchers.py`    | RSS + Brave Search |
 | `state.py`       | URL normalization, sent/candidate state persistence |
-| `llm.py`         | xAI primary + GitHub Models fallback clients, query gen, triage parsing |
+| `llm.py`         | Configurable primary provider + GitHub Models fallback clients, query gen, triage parsing |
 | `render.py`      | HTML (escaped) + plain-text rendering, subject line |
 | `mailer.py`      | Resend delivery |
 | `slack.py`       | Optional Slack webhook notification |
@@ -207,8 +207,8 @@ The cache save step runs with `if: always()` so state is preserved even when the
 
 Almost free at current usage — roughly $0.60/month total:
 
-- xAI Grok-4.5 (primary): paid per-token, but volume is small — 5–6 query/triage calls per run (anchored query when warranted, independent query, combined compliance+PQC query, tooling-scan, ai-lab, threat + tooling triage in parallel; ~25K tokens), plus up to 3 short enrichment calls on days when items are actually selected (most days: zero). Reasoning effort is pinned to "low" — enough judgment for triage-style calls without deep-reasoning latency or cost.
-- GitHub Models GPT-4.1-nano (fallback): free tier, only used when the xAI call fails (nano because free-tier budgets can exhaust mid-cycle on mini-class models).
+- Primary provider (xAI Grok-4.5 by default; see [Environment](#2-environment-local-runs-only) for switching): paid per-token, but volume is small — 5–6 query/triage calls per run (anchored query when warranted, independent query, combined compliance+PQC query, tooling-scan, ai-lab, threat + tooling triage in parallel; ~25K tokens), plus up to 3 short enrichment calls on days when items are actually selected (most days: zero). On xAI, reasoning effort is pinned to "low" via `LLM_EXTRA` — enough judgment for triage-style calls without deep-reasoning latency or cost.
+- GitHub Models GPT-4.1-nano (fallback): free tier, only used when the primary provider call fails (nano because free-tier budgets can exhaust mid-cycle on mini-class models).
 - GitHub Actions: ~1 min/run, well within free tier
 - Brave Search: 2,000 queries/month free; this bot uses ~160/month (8 queries/run × ~20 runs)
 - Resend: 3,000 emails/month free; this sends ≤22/month — and typically far fewer given the SKIP-preferred bar
@@ -218,7 +218,7 @@ Almost free at current usage — roughly $0.60/month total:
 
 - **All feeds dead**: RSS pool empty; search-only digest if queries still generate; SKIP if nothing found
 - **Brave Search down / key missing**: `fetch_search_articles` returns empty, RSS-only digest
-- **xAI down**: every call falls through to GitHub Models GPT-4.1-nano transparently
+- **Primary provider down**: every call falls through to GitHub Models GPT-4.1-nano transparently
 - **Both LLM providers down**: query gen / triage return empty; if both triage calls fail the digest is skipped and state is still persisted
 - **Triage hangs**: each future is bounded by `2 * LLM_TIMEOUT_SEC + 10` seconds so the workflow doesn't sit until the 10‑minute job timeout
 - **Enrichment fetch/LLM failure**: per-item and best-effort; the digest ships with the triage-time why/action
