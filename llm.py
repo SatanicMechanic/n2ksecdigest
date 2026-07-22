@@ -71,7 +71,12 @@ def _chat_completion(base_url: str, api_key: str, model: str,
         timeout=LLM_TIMEOUT_SEC,
     )
     resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"].strip()
+    content = resp.json()["choices"][0]["message"]["content"]
+    if isinstance(content, list):
+        # Mistral reasoning_effort="high" returns a list of chunks
+        # (ThinkChunk + TextChunk) instead of a plain string.
+        content = "".join(c["text"] for c in content if c.get("type") == "text")
+    return content.strip()
 
 
 def call_primary(system_prompt: str, user_message: str,

@@ -279,6 +279,18 @@ def test_call_primary_succeeds(monkeypatch):
     mock_post.assert_called_once()
 
 
+def test_call_primary_extracts_text_from_chunked_content(monkeypatch):
+    monkeypatch.setenv("XAI_API_KEY", "tok")
+    chunks = [
+        {"type": "thinking", "text": "reasoning..."},
+        {"type": "text", "text": "result"},
+    ]
+    mock_post = _make_mock_post(chunks)
+    with mock.patch("llm.requests.post", mock_post):
+        result = llm.call_primary("sys", "user")
+    assert result == "result"
+
+
 def test_call_primary_sets_reasoning_effort_low(monkeypatch):
     monkeypatch.setenv("XAI_API_KEY", "tok")
     mock_post = _make_mock_post()
