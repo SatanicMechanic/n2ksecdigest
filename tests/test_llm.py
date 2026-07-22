@@ -211,14 +211,14 @@ def test_generate_slow_queries_caps_to_configured_counts(monkeypatch):
 
 def test_generate_tooling_scan_queries_parses_array(monkeypatch):
     monkeypatch.setenv("GH_MODELS_TOKEN", "x")
-    with mock.patch.object(llm, "call_xai", return_value='["AI exploit chain model release"]'):
+    with mock.patch.object(llm, "call_primary", return_value='["AI exploit chain model release"]'):
         out = llm.generate_tooling_scan_queries(24)
     assert out == ["AI exploit chain model release"]
 
 
 def test_generate_tooling_scan_queries_handles_garbage(monkeypatch):
     monkeypatch.setenv("GH_MODELS_TOKEN", "x")
-    with mock.patch.object(llm, "call_xai", return_value="not json"):
+    with mock.patch.object(llm, "call_primary", return_value="not json"):
         out = llm.generate_tooling_scan_queries(24)
     assert out == []
 
@@ -226,7 +226,7 @@ def test_generate_tooling_scan_queries_handles_garbage(monkeypatch):
 def test_generate_tooling_scan_queries_caps_to_configured_count(monkeypatch):
     monkeypatch.setenv("GH_MODELS_TOKEN", "x")
     monkeypatch.setattr(llm, "TOOLING_SCAN_QUERIES", 1)
-    with mock.patch.object(llm, "call_xai", return_value='["a", "b", "c"]'):
+    with mock.patch.object(llm, "call_primary", return_value='["a", "b", "c"]'):
         out = llm.generate_tooling_scan_queries(24)
     assert len(out) == 1
 
@@ -235,14 +235,14 @@ def test_generate_tooling_scan_queries_caps_to_configured_count(monkeypatch):
 
 def test_generate_ai_lab_queries_parses_array(monkeypatch):
     monkeypatch.setenv("GH_MODELS_TOKEN", "x")
-    with mock.patch.object(llm, "call_xai", return_value='["Anthropic Claude Mythos cyber capability"]'):
+    with mock.patch.object(llm, "call_primary", return_value='["Anthropic Claude Mythos cyber capability"]'):
         out = llm.generate_ai_lab_queries(24)
     assert out == ["Anthropic Claude Mythos cyber capability"]
 
 
 def test_generate_ai_lab_queries_handles_garbage(monkeypatch):
     monkeypatch.setenv("GH_MODELS_TOKEN", "x")
-    with mock.patch.object(llm, "call_xai", return_value="not json"):
+    with mock.patch.object(llm, "call_primary", return_value="not json"):
         out = llm.generate_ai_lab_queries(24)
     assert out == []
 
@@ -250,12 +250,12 @@ def test_generate_ai_lab_queries_handles_garbage(monkeypatch):
 def test_generate_ai_lab_queries_caps_to_configured_count(monkeypatch):
     monkeypatch.setenv("GH_MODELS_TOKEN", "x")
     monkeypatch.setattr(llm, "AI_LAB_QUERIES", 1)
-    with mock.patch.object(llm, "call_xai", return_value='["a", "b", "c"]'):
+    with mock.patch.object(llm, "call_primary", return_value='["a", "b", "c"]'):
         out = llm.generate_ai_lab_queries(24)
     assert len(out) == 1
 
 
-# --- call_xai ---
+# --- call_primary ---
 
 def _make_mock_post(content="result"):
     mock_response = mock.MagicMock()
@@ -270,28 +270,28 @@ def _post_payload(mock_post):
     return kwargs["json"]
 
 
-def test_call_xai_succeeds(monkeypatch):
+def test_call_primary_succeeds(monkeypatch):
     monkeypatch.setenv("XAI_API_KEY", "tok")
     mock_post = _make_mock_post("result")
     with mock.patch("llm.requests.post", mock_post):
-        result = llm.call_xai("sys", "user")
+        result = llm.call_primary("sys", "user")
     assert result == "result"
     mock_post.assert_called_once()
 
 
-def test_call_xai_sets_reasoning_effort_low(monkeypatch):
+def test_call_primary_sets_reasoning_effort_low(monkeypatch):
     monkeypatch.setenv("XAI_API_KEY", "tok")
     mock_post = _make_mock_post()
     with mock.patch("llm.requests.post", mock_post):
-        llm.call_xai("sys", "user")
+        llm.call_primary("sys", "user")
     assert _post_payload(mock_post).get("reasoning_effort") == "low"
 
 
-def test_call_xai_sets_json_mode(monkeypatch):
+def test_call_primary_sets_json_mode(monkeypatch):
     monkeypatch.setenv("XAI_API_KEY", "tok")
     mock_post = _make_mock_post()
     with mock.patch("llm.requests.post", mock_post):
-        llm.call_xai("sys", "user", json_mode=True)
+        llm.call_primary("sys", "user", json_mode=True)
     assert _post_payload(mock_post).get("response_format") == {"type": "json_object"}
 
 
@@ -338,7 +338,7 @@ def test_call_llm_raises_http_error_on_bad_status(monkeypatch):
     mock_response.raise_for_status.side_effect = Exception("HTTP 500")
     with mock.patch("llm.requests.post", return_value=mock_response), \
          pytest.raises(Exception):
-        llm.call_xai("sys", "user")
+        llm.call_primary("sys", "user")
 
 
 # --- call_llm (dispatcher + fallback) ---
@@ -354,7 +354,7 @@ def test_call_llm_uses_xai_primary(monkeypatch):
 def test_call_llm_falls_back_on_xai_failure(monkeypatch):
     monkeypatch.setenv("XAI_API_KEY", "tok")
     monkeypatch.setenv("GH_MODELS_TOKEN", "tok")
-    with mock.patch.object(llm, "call_xai", side_effect=Exception("xai down")), \
+    with mock.patch.object(llm, "call_primary", side_effect=Exception("xai down")), \
          mock.patch.object(llm, "call_github_models", return_value="from-fallback"):
         result = llm.call_llm("sys", "user")
     assert result == "from-fallback"

@@ -91,12 +91,48 @@ BLOCKLIST_URL_PATTERNS: list[str] = [
 ]
 
 # ---------------------------------------------------------------------------
-# LLM (GitHub Models)
+# LLM
 # ---------------------------------------------------------------------------
+# Primary provider is any OpenAI-compatible chat-completions endpoint.
+# Normal switch — two env vars plus the key:
+#   LLM_PROVIDER=mistral LLM_MODEL=mistral-large-latest MISTRAL_API_KEY=...
+# Provider not in the table below? Skip LLM_PROVIDER and set LLM_BASE_URL /
+# LLM_API_KEY_ENV yourself. LLM_EXTRA is JSON merged into the request body
+# (provider-specific knobs, e.g. {"reasoning_effort": "low"} for xAI).
+
+def _env(name: str, default: str = "") -> str:
+    # Unset *and* empty both mean "default" — CI passes unset repo vars as "".
+    return os.environ.get(name) or default
+
+
+# base_url, key env var, default extra body
+PROVIDERS = {
+    "xai":        ("https://api.x.ai/v1", "XAI_API_KEY", '{"reasoning_effort": "low"}'),
+    "mistral":    ("https://api.mistral.ai/v1", "MISTRAL_API_KEY", "{}"),
+    "openai":     ("https://api.openai.com/v1", "OPENAI_API_KEY", "{}"),
+    "groq":       ("https://api.groq.com/openai/v1", "GROQ_API_KEY", "{}"),
+    "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", "{}"),
+    "together":   ("https://api.together.xyz/v1", "TOGETHER_API_KEY", "{}"),
+    "deepseek":   ("https://api.deepseek.com/v1", "DEEPSEEK_API_KEY", "{}"),
+    "ollama":     ("http://localhost:11434/v1", "OLLAMA_API_KEY", "{}"),
+}
+
+LLM_PROVIDER = _env("LLM_PROVIDER", "xai").lower()
+if LLM_PROVIDER not in PROVIDERS and not _env("LLM_BASE_URL"):
+    raise SystemExit(
+        f"Unknown LLM_PROVIDER {LLM_PROVIDER!r}; pick one of "
+        f"{', '.join(sorted(PROVIDERS))} or set LLM_BASE_URL + LLM_API_KEY_ENV."
+    )
+_base, _key_env, _extra = PROVIDERS.get(LLM_PROVIDER, ("", "", "{}"))
+
+LLM_BASE_URL = _env("LLM_BASE_URL", _base)
+LLM_MODEL = _env("LLM_MODEL", "grok-4.5" if LLM_PROVIDER == "xai" else "")
+LLM_API_KEY_ENV = _env("LLM_API_KEY_ENV", _key_env)
+LLM_EXTRA = _env("LLM_EXTRA", _extra)
+if not LLM_MODEL:
+    raise SystemExit(f"LLM_MODEL must be set for provider {LLM_PROVIDER!r}.")
 
 GITHUB_MODELS_BASE_URL = "https://models.github.ai/inference"
-XAI_BASE_URL = "https://api.x.ai/v1"
-XAI_MODEL = "grok-4.5"                  # primary model (all calls)
 FALLBACK_MODEL = "openai/gpt-4.1-nano"  # GitHub Models fallback (all calls)
 # nano over mini: GitHub Models free-tier budgets can 403 ("budget limit
 # reached") on mini/4o-class models partway through a billing cycle; nano is

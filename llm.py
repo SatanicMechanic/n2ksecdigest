@@ -4,7 +4,8 @@ triage output parser.
 Plain requests against the chat-completions API — the endpoints are
 OpenAI-compatible and we only ever need one blocking call, so the SDK
 (httpx/pydantic tree) isn't worth the dependency. call_llm retries by
-falling back from xAI to GitHub Models on any error.
+falling back from the primary provider to GitHub Models on any error.
+The primary provider is configured entirely by env (see config.py).
 """
 
 import os
@@ -14,7 +15,8 @@ import datetime
 import requests
 
 from config import (
-    GITHUB_MODELS_BASE_URL, XAI_BASE_URL, XAI_MODEL, FALLBACK_MODEL,
+    GITHUB_MODELS_BASE_URL, FALLBACK_MODEL,
+    LLM_BASE_URL, LLM_MODEL, LLM_API_KEY_ENV, LLM_EXTRA,
     LLM_TIMEOUT_SEC,
     MAX_SEARCH_QUERIES, COMPLIANCE_QUERIES, PQC_QUERIES, TOOLING_SCAN_QUERIES,
     AI_LAB_QUERIES,
@@ -72,19 +74,14 @@ def _chat_completion(base_url: str, api_key: str, model: str,
     return resp.json()["choices"][0]["message"]["content"].strip()
 
 
-def call_xai(system_prompt: str, user_message: str,
-             temperature: float = 0.15,
-             json_mode: bool = False) -> str:
-    """Call xAI (Grok).
-
-    `reasoning_effort` is set explicitly — "low" trades some latency/cost
-    for better judgment on triage-style calls, and pins us against xAI
-    changing the default.
-    """
+def call_primary(system_prompt: str, user_message: str,
+                 temperature: float = 0.15,
+                 json_mode: bool = False) -> str:
+    """Call the configured primary provider (any OpenAI-compatible endpoint)."""
     return _chat_completion(
-        XAI_BASE_URL, os.environ["XAI_API_KEY"], XAI_MODEL,
+        LLM_BASE_URL, os.environ[LLM_API_KEY_ENV], LLM_MODEL,
         system_prompt, user_message, temperature, json_mode,
-        extra={"reasoning_effort": "low"},
+        extra=json.loads(LLM_EXTRA) if LLM_EXTRA else None,
     )
 
 
@@ -101,11 +98,11 @@ def call_github_models(system_prompt: str, user_message: str,
 def call_llm(system_prompt: str, user_message: str,
              temperature: float = 0.15,
              json_mode: bool = False) -> str:
-    """Primary entrypoint: try xAI, fall back to GitHub Models on any error."""
+    """Primary entrypoint: try the configured provider, fall back to GitHub Models."""
     try:
-        return call_xai(system_prompt, user_message, temperature, json_mode)
+        return call_primary(system_prompt, user_message, temperature, json_mode)
     except Exception as exc:
-        print(f"Warning: xAI call failed ({exc!r}); falling back to GitHub Models.")
+        print(f"Warning: {LLM_BASE_URL} call failed ({exc!r}); falling back to GitHub Models.")
         return call_github_models(system_prompt, user_message, temperature, json_mode)
 
 

@@ -110,7 +110,12 @@ Copy `.env.example` → `.env` and fill in the values below. This file is for ru
 
 | Variable            | Source | Required? |
 |---------------------|--------|-----------|
-| `XAI_API_KEY`       | xAI console (primary LLM) | Yes |
+| `XAI_API_KEY`       | xAI console (primary LLM, default provider) | Yes, unless `LLM_*` points elsewhere |
+| `LLM_PROVIDER`      | One of `xai`, `mistral`, `openai`, `groq`, `openrouter`, `together`, `deepseek`, `ollama` (default `xai`) | No |
+| `LLM_MODEL`         | Model id for that provider (default `grok-4.5` on xAI; required otherwise) | No |
+| `LLM_BASE_URL`      | Only for a provider not in the table — any OpenAI-compatible base URL | No |
+| `LLM_API_KEY_ENV`   | Only for a provider not in the table — name of the env var holding its key | No |
+| `LLM_EXTRA`         | JSON merged into the request body (default `{"reasoning_effort": "low"}`, xAI-specific — set to `{}` for other providers) | No |
 | `GH_MODELS_TOKEN`   | Fine-grained PAT with `models:read` scope (fallback LLM) | Yes |
 | `RESEND_API_KEY`    | Resend dashboard | Yes |
 | `DIGEST_TO_EMAIL`   | Comma-separated recipient list | Yes |
@@ -143,7 +148,9 @@ If `stack.txt` is missing or empty the bot exits with an error rather than silen
 ### 4. Repo secrets + variables (for Actions)
 
 **Secrets:** `XAI_API_KEY`, `GH_MODELS_TOKEN`, `RESEND_API_KEY`, `BRAVE_API_KEY`
-**Variables:** `DIGEST_TO_EMAIL`, `DIGEST_FROM_EMAIL`
+**Variables:** `DIGEST_TO_EMAIL`, `DIGEST_FROM_EMAIL`, optionally `LLM_PROVIDER` / `LLM_MODEL` / `LLM_EXTRA`
+
+Switching provider is two variables and a secret — e.g. `LLM_PROVIDER=mistral`, `LLM_MODEL=mistral-large-latest`, secret `MISTRAL_API_KEY`. `XAI_API_KEY`, `MISTRAL_API_KEY`, and `OPENAI_API_KEY` are already wired into `digest.yml`; for any other provider add one `env:` line there. A provider missing from `config.PROVIDERS` works too — set `LLM_BASE_URL` and `LLM_API_KEY_ENV` instead of `LLM_PROVIDER`. An unknown `LLM_PROVIDER` fails fast at startup rather than silently calling xAI.
 
 `GH_MODELS_TOKEN` must be a fine-grained PAT with `models:read` — Actions' built-in `GITHUB_TOKEN` does not have that scope.
 
