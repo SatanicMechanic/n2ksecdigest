@@ -1,6 +1,6 @@
 # n2ksecdigest
 
-Automated product-security news digest. Runs on GitHub Actions twice each weekday, fetches from RSS and web search, triages through a configurable LLM provider (xAI Grok-4.5 by default, with GitHub Models GPT-4.1-nano as fallback) against a **news-cycle fire-tier bar**, and emails a short digest via Resend.
+Automated product-security news digest. Runs on GitHub Actions twice each weekday, fetches from RSS and web search, triages through any OpenAI-compatible LLM provider (xAI Grok-4.5 by default; built-in presets also cover Mistral, OpenAI, Groq, OpenRouter, Together, DeepSeek, and Ollama, with GitHub Models GPT-4.1-nano as fallback) against a **news-cycle fire-tier bar**, and emails a short digest via Resend.
 
 ## Should you actually use this?
 
@@ -77,7 +77,7 @@ This bot is complementary to — not a replacement for — weekly digests like [
 | `digest.py`      | Orchestrator (entrypoint: `python digest.py`) |
 | `fetchers.py`    | RSS + Brave Search |
 | `state.py`       | URL normalization, sent/candidate state persistence |
-| `llm.py`         | Configurable primary provider + GitHub Models fallback clients, query gen, triage parsing |
+| `llm.py`         | Any OpenAI-compatible primary provider + GitHub Models fallback clients, query gen, triage parsing |
 | `render.py`      | HTML (escaped) + plain-text rendering, subject line |
 | `mailer.py`      | Resend delivery |
 | `slack.py`       | Optional Slack webhook notification |
