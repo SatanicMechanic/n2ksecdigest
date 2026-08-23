@@ -182,4 +182,5 @@ BRAVE_GOGGLES = os.environ.get("BRAVE_GOGGLES", "").strip()
 # ---------------------------------------------------------------------------
 
 FEED_FETCH_TIMEOUT_SEC = 10
-HTTP_USER_AGENT = "n2ksecdigest/2.0 (+github.com)"
+# Browser UA, not a descriptive bot UA: Microsoft's blog WAF 403s the latter.
+HTTP_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
