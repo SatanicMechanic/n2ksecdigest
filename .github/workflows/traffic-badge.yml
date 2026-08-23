@@ -1,0 +1,41 @@
+name: Traffic badge
+
+# GitHub's traffic API is a rolling 14-day window with no history before
+# that. This snapshots it daily into badges/clone-history.json so the README
+# badge can show an all-time total instead of "last 14 days".
+
+on:
+  schedule:
+    - cron: '30 6 * * *'  # daily; offset from digest/sync-upstream/check_feeds crons
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-badge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
+        with:
+          enable-cache: true
+          python-version: '3.12'
+
+      - name: Update traffic badge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: uv run python update_traffic_badge.py
+
+      - name: Commit if changed
+        run: |
+          if ! git diff --quiet -- badges/; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add badges/
+            git commit -m "chore: update traffic badge [skip ci]"
+            git push
+          fi

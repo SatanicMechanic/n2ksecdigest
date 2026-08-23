@@ -1,5 +1,7 @@
 # n2ksecdigest
 
+![Clones](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/SatanicMechanic/n2ksecdigest/main/badges/clones.json)
+
 Automated product-security news digest. Runs on GitHub Actions twice each weekday, fetches from RSS and web search, triages through any OpenAI-compatible LLM provider (xAI Grok-4.5 by default; built-in presets also cover Mistral, OpenAI, Groq, OpenRouter, Together, DeepSeek, and Ollama, with GitHub Models GPT-4.1-nano as fallback) against a **news-cycle fire-tier bar**, and emails a short digest via Resend.
 
 ## Should you actually use this?
