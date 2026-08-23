@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: digest
@@ -70,3 +70,21 @@ jobs:
         with:
           path: state.json
           key: digest-state-${{ github.run_id }}
+
+      # actions/cache is best-effort (evictable under storage pressure or
+      # after 7 days unused) — it silently reset dedup history before. The
+      # 'sent' subset is what actually causes visible bugs when lost (repeat
+      # stories), so it alone gets committed to git for durability. 'candidate'
+      # cooldown stays cache-only: losing it just lets a near-miss resurface
+      # a day early, which the LLM triage self-corrects.
+      - name: Commit durable state
+        if: always()
+        run: |
+          uv run python state.py
+          if ! git diff --quiet -- state.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add state.json
+            git commit -m "chore: persist sent digest state [skip ci]"
+            git push
+          fi
