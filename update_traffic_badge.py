@@ -20,7 +20,7 @@ BADGE_PATH = "badges/clones.json"
 def fetch_daily_clones(repo: str) -> list[dict]:
     raw = subprocess.run(
         ["gh", "api", f"repos/{repo}/traffic/clones"],
-        capture_output=True, text=True, check=True,
+        stdout=subprocess.PIPE, text=True, check=True,
     ).stdout
     return json.loads(raw)["clones"]
 

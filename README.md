@@ -94,6 +94,8 @@ This bot is complementary to — not a replacement for — weekly digests like [
 
 ## Setup
 
+**If you fork this**, note that `digest.yml` and `check_feeds.yml` run on GitHub's schedule immediately, in *your* fork, using *your* repo's secrets — that's by design (§3 below is written for you). Until you complete this Setup section, `digest.yml` will fail fast on every scheduled run (deliberately — see [Design principle](#design-principle) on `stack.txt`). If you're not ready to configure it yet, disable Actions for the fork under Settings → Actions until you are; otherwise GitHub auto-disables a fork's scheduled workflows after 60 days with no repo activity. (`traffic-badge.yml` is the one exception — it only runs in the upstream repo, since the README badge above is hardcoded to it.)
+
 ### 1. Clone and install
 
 Requires [uv](https://docs.astral.sh/uv/) — replaces `pip` + `venv`. Install with `curl -LsSf https://astral.sh/uv/install.sh | sh` or your platform's package manager.
@@ -155,6 +157,8 @@ If `stack.txt` is missing or empty the bot exits with an error rather than silen
 Switching provider is two variables and a secret — e.g. `LLM_PROVIDER=mistral`, `LLM_MODEL=mistral-large-latest`, secret `MISTRAL_API_KEY`. `XAI_API_KEY`, `MISTRAL_API_KEY`, and `OPENAI_API_KEY` are already wired into `digest.yml`; for any other provider add one `env:` line there. A provider missing from `config.PROVIDERS` works too — set `LLM_BASE_URL` and `LLM_API_KEY_ENV` instead of `LLM_PROVIDER`. An unknown `LLM_PROVIDER` fails fast at startup rather than silently calling xAI.
 
 `GH_MODELS_TOKEN` must be a fine-grained PAT with `models:read` — Actions' built-in `GITHUB_TOKEN` does not have that scope.
+
+`traffic-badge.yml` (upstream-only, see Setup above) needs its own `TRAFFIC_PAT` secret: a fine-grained PAT scoped to this repo only, with **Administration: Read-only** — the traffic/clones API requires that permission, which isn't grantable to `GITHUB_TOKEN` at all.
 
 ### 5. Local run
 

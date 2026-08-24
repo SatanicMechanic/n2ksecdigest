@@ -16,6 +16,7 @@ jobs:
   update-badge:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    if: github.repository == 'SatanicMechanic/n2ksecdigest'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -26,7 +27,11 @@ jobs:
 
       - name: Update traffic badge
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # repos/{owner}/{repo}/traffic/clones needs the "Administration"
+          # repo permission — not grantable to the built-in GITHUB_TOKEN, so
+          # this needs a fine-grained PAT (this repo only, Administration:
+          # Read-only) stored as TRAFFIC_PAT.
+          GH_TOKEN: ${{ secrets.TRAFFIC_PAT }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: uv run python update_traffic_badge.py
 
