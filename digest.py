@@ -27,7 +27,7 @@ from llm import (
 from config import (
     COMPLIANCE_QUERIES, PQC_QUERIES, TOOLING_SCAN_QUERIES, AI_LAB_QUERIES,
     TRIAGE_GLOBAL_CAP, TRIAGE_TOOLING_CAP,
-    LLM_TIMEOUT_SEC,
+    LLM_TIMEOUT_SEC, LLM_API_KEY_ENV, LLM_MODEL, LLM_PROVIDER,
     MAX_SEARCH_RESULTS, BROAD_SEARCH_RESULTS,
 )
 from fetchers import fetch_rss_articles, fetch_search_articles
@@ -39,12 +39,20 @@ from slack import send_slack
 load_dotenv()
 
 
-# Required env vars: the run cannot send a digest without these.
-_REQUIRED_ENV = ("XAI_API_KEY", "GH_MODELS_TOKEN", "RESEND_API_KEY",
+# Required env vars: the run cannot send a digest without these. The LLM key is
+# whichever one the configured provider uses — hardcoding XAI_API_KEY here meant
+# every non-xAI provider still demanded an unused xAI key.
+_REQUIRED_ENV = (LLM_API_KEY_ENV, "RESEND_API_KEY",
                  "DIGEST_TO_EMAIL", "DIGEST_FROM_EMAIL")
 
 
 def _check_env() -> None:
+    if not LLM_MODEL:
+        raise RuntimeError(
+            f"LLM_MODEL is required (provider {LLM_PROVIDER!r}). Set it to the "
+            "model id you want to run — it has no built-in default so that "
+            "switching models is a config change, not a code change."
+        )
     missing = [name for name in _REQUIRED_ENV if not os.environ.get(name)]
     if missing:
         raise RuntimeError(

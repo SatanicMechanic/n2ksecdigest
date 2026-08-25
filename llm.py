@@ -15,7 +15,6 @@ import datetime
 import requests
 
 from config import (
-    GITHUB_MODELS_BASE_URL, FALLBACK_MODEL,
     LLM_BASE_URL, LLM_MODEL, LLM_API_KEY_ENV, LLM_EXTRA,
     LLM_TIMEOUT_SEC,
     MAX_SEARCH_QUERIES, COMPLIANCE_QUERIES, PQC_QUERIES, TOOLING_SCAN_QUERIES,
@@ -79,36 +78,19 @@ def _chat_completion(base_url: str, api_key: str, model: str,
     return content.strip()
 
 
-def call_primary(system_prompt: str, user_message: str,
-                 temperature: float = 0.15,
-                 json_mode: bool = False) -> str:
-    """Call the configured primary provider (any OpenAI-compatible endpoint)."""
+def call_llm(system_prompt: str, user_message: str,
+             temperature: float = 0.15,
+             json_mode: bool = False) -> str:
+    """Call the configured provider (any OpenAI-compatible endpoint).
+
+    Raises on failure rather than falling back to a second provider — callers
+    already degrade safely (a failed triage skips the digest for that run).
+    """
     return _chat_completion(
         LLM_BASE_URL, os.environ[LLM_API_KEY_ENV], LLM_MODEL,
         system_prompt, user_message, temperature, json_mode,
         extra=json.loads(LLM_EXTRA) if LLM_EXTRA else None,
     )
-
-
-def call_github_models(system_prompt: str, user_message: str,
-                       temperature: float = 0.15,
-                       json_mode: bool = False) -> str:
-    """Call GitHub Models (fallback) via its OpenAI-compatible endpoint."""
-    return _chat_completion(
-        GITHUB_MODELS_BASE_URL, os.environ["GH_MODELS_TOKEN"], FALLBACK_MODEL,
-        system_prompt, user_message, temperature, json_mode,
-    )
-
-
-def call_llm(system_prompt: str, user_message: str,
-             temperature: float = 0.15,
-             json_mode: bool = False) -> str:
-    """Primary entrypoint: try the configured provider, fall back to GitHub Models."""
-    try:
-        return call_primary(system_prompt, user_message, temperature, json_mode)
-    except Exception as exc:
-        print(f"Warning: {LLM_BASE_URL} call failed ({exc!r}); falling back to GitHub Models.")
-        return call_github_models(system_prompt, user_message, temperature, json_mode)
 
 
 # ---------------------------------------------------------------------------

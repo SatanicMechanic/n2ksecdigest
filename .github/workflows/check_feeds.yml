@@ -13,6 +13,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # This repo is a template — inert here, active in private mirrors.
+    if: github.repository != 'SatanicMechanic/n2ksecdigest'
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1

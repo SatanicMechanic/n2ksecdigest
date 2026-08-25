@@ -19,6 +19,10 @@ jobs:
   digest:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # This repo is a template — inert here, active in private mirrors. Without
+    # this the schedule fires twice daily upstream with no secrets and no
+    # LLM_MODEL, failing every run.
+    if: github.repository != 'SatanicMechanic/n2ksecdigest'
 
     steps:
       - name: Checkout
@@ -44,10 +48,12 @@ jobs:
 
       - name: Run digest
         env:
-          # Primary LLM provider (defaults to xAI/Grok). To switch: set the
-          # LLM_PROVIDER + LLM_MODEL repo variables and add that provider's
-          # key secret below. LLM_BASE_URL/LLM_API_KEY_ENV are only needed for
-          # a provider not in config.PROVIDERS.
+          # LLM_MODEL is REQUIRED — there is no built-in default, so a new
+          # model release is a repo-variable change, not a code change. The
+          # provider defaults to GitHub Models (GH_MODELS_TOKEN below is the
+          # only key needed); to switch, set LLM_PROVIDER and add that
+          # provider's key secret below. LLM_BASE_URL/LLM_API_KEY_ENV are only
+          # needed for a provider not in config.PROVIDERS.
           LLM_PROVIDER:      ${{ vars.LLM_PROVIDER }}
           LLM_MODEL:         ${{ vars.LLM_MODEL }}
           LLM_BASE_URL:      ${{ vars.LLM_BASE_URL }}
@@ -77,7 +83,6 @@ jobs:
       # Fixing the gate then exposed the real blocker — main's ruleset requires
       # a PR plus the "test" check, and GitHub Actions is not an eligible bypass
       # actor. The only way through is a bypass credential, which this job must
-      # not hold: requirements.txt pins floors (`>=`) with no lockfile, so one
-      # bad release runs code here and branch protection is what stops that
-      # becoming a push to main. Losing the cache costs a repeated story, which
-      # ages out in 30 days — not worth that trade.
+      # not hold: it installs third-party code, so branch protection is what
+      # stops a bad dependency release from reaching main. Losing the cache
+      # costs a repeated story, which ages out in 30 days — not worth that trade.

@@ -93,7 +93,12 @@ BLOCKLIST_URL_PATTERNS: list[str] = [
 # ---------------------------------------------------------------------------
 # LLM
 # ---------------------------------------------------------------------------
-# Primary provider is any OpenAI-compatible chat-completions endpoint.
+# One provider, any OpenAI-compatible chat-completions endpoint. There is no
+# fallback provider: a second path meant a second token, a second model and a
+# second set of failure modes to reason about, all to salvage a run that the
+# pipeline already skips safely. A failed run just means no digest that cycle.
+#
+# Defaults to GitHub Models so a fresh clone needs no third-party account.
 # Normal switch — two env vars plus the key:
 #   LLM_PROVIDER=mistral LLM_MODEL=mistral-large-latest MISTRAL_API_KEY=...
 # Provider not in the table below? Skip LLM_PROVIDER and set LLM_BASE_URL /
@@ -107,6 +112,9 @@ def _env(name: str, default: str = "") -> str:
 
 # base_url, key env var, default extra body
 PROVIDERS = {
+    # Default: no third-party account or billing to set up — a GitHub PAT with
+    # models:read is all it takes, which anyone running this on Actions can mint.
+    "github":     ("https://models.github.ai/inference", "GH_MODELS_TOKEN", "{}"),
     "xai":        ("https://api.x.ai/v1", "XAI_API_KEY", '{"reasoning_effort": "low"}'),
     "mistral":    ("https://api.mistral.ai/v1", "MISTRAL_API_KEY", "{}"),
     "openai":     ("https://api.openai.com/v1", "OPENAI_API_KEY", "{}"),
@@ -117,7 +125,7 @@ PROVIDERS = {
     "ollama":     ("http://localhost:11434/v1", "OLLAMA_API_KEY", "{}"),
 }
 
-LLM_PROVIDER = _env("LLM_PROVIDER", "xai").lower()
+LLM_PROVIDER = _env("LLM_PROVIDER", "github").lower()
 if LLM_PROVIDER not in PROVIDERS and not _env("LLM_BASE_URL"):
     raise SystemExit(
         f"Unknown LLM_PROVIDER {LLM_PROVIDER!r}; pick one of "
@@ -126,18 +134,17 @@ if LLM_PROVIDER not in PROVIDERS and not _env("LLM_BASE_URL"):
 _base, _key_env, _extra = PROVIDERS.get(LLM_PROVIDER, ("", "", "{}"))
 
 LLM_BASE_URL = _env("LLM_BASE_URL", _base)
-LLM_MODEL = _env("LLM_MODEL", "grok-4.5" if LLM_PROVIDER == "xai" else "")
+# Deliberately not defaulted per provider. Model ids churn faster than
+# anything else here (grok-4.5 → grok-5 → ...), and baking one in makes every
+# model release a code change. Base URLs and key env vars above are stable
+# infrastructure, so those keep their defaults; the model id does not.
+LLM_MODEL = _env("LLM_MODEL")
 LLM_API_KEY_ENV = _env("LLM_API_KEY_ENV", _key_env)
 LLM_EXTRA = _env("LLM_EXTRA", _extra)
-if not LLM_MODEL:
-    raise SystemExit(f"LLM_MODEL must be set for provider {LLM_PROVIDER!r}.")
+# Validated in digest._check_env rather than here: check_feeds.py imports this
+# module and never touches the LLM, so raising at import time would break the
+# feed health check over a setting it doesn't use.
 
-GITHUB_MODELS_BASE_URL = "https://models.github.ai/inference"
-FALLBACK_MODEL = "openai/gpt-4.1-nano"  # GitHub Models fallback (all calls)
-# nano over mini: GitHub Models free-tier budgets can 403 ("budget limit
-# reached") on mini/4o-class models partway through a billing cycle; nano is
-# the cheapest fallback that keeps the pipeline alive. Bump back up if your
-# tier's budget allows.
 LLM_TIMEOUT_SEC = 60                    # per-provider request budget
 TRIAGE_GLOBAL_CAP = 3                   # max total items across both triage calls
 TRIAGE_TOOLING_CAP = 1                  # max items from the tooling triage call

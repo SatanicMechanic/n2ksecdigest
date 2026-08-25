@@ -1,10 +1,10 @@
-"""Quick smoke test for the configured LLM provider and GitHub Models fallback.
+"""Quick smoke test for the configured LLM provider.
 
 Manual: hits the real APIs. Filename is intentionally not `test_*.py` so
 pytest's auto-collection skips it; run it directly when you want to verify
 provider connectivity.
 
-Run with:  XAI_API_KEY=<key> GH_MODELS_TOKEN=<pat> .venv/bin/python3 xai_smoke.py
+Run with:  LLM_MODEL=<model> <PROVIDER_KEY>=<key> .venv/bin/python3 llm_smoke.py
 """
 
 import json
@@ -33,28 +33,24 @@ def main():
     load_dotenv()
 
     t0 = time.monotonic()
-    raw = llm.call_primary("You are a helpful assistant.", "Say hello.")
-    print(f"\n[primary plain]  {time.monotonic()-t0:.1f}s  →  {raw!r}")
+    raw = llm.call_llm("You are a helpful assistant.", "Say hello.")
+    print(f"\n[plain]  {time.monotonic()-t0:.1f}s  →  {raw!r}")
 
     t0 = time.monotonic()
-    raw = llm.call_primary(
+    raw = llm.call_llm(
         "Generate exactly 2 security search queries. Return ONLY a JSON array of strings. No preamble.",
         "Generate 2 queries targeting actively exploited vulnerabilities.",
         temperature=0.4,
     )
-    check("primary JSON array", raw, time.monotonic()-t0, list)
+    check("JSON array", raw, time.monotonic()-t0, list)
 
     t0 = time.monotonic()
-    raw = llm.call_primary(
+    raw = llm.call_llm(
         'Return ONLY a JSON object: {"compliance": ["q1"], "pqc": ["q1"]}',
         "Generate 1 compliance query and 1 PQC query.",
         temperature=0.3, json_mode=True,
     )
-    check("primary JSON object (json_mode)", raw, time.monotonic()-t0, dict)
-
-    t0 = time.monotonic()
-    raw = llm.call_github_models("You are a security analyst.", "Reply with exactly: ok")
-    print(f"\n[GH Models fallback]  {time.monotonic()-t0:.1f}s  →  {raw!r}")
+    check("JSON object (json_mode)", raw, time.monotonic()-t0, dict)
 
     print(f"\n{'='*60}\nDone.")
 

@@ -9,11 +9,10 @@ name: Dependabot auto-merge
 # The poll targets that one check by name — `gh pr checks --watch` would
 # deadlock waiting on this very workflow's own in-progress check.
 #
-# Major version bumps are deliberately NOT auto-merged: floor-pinned
-# requirements (>=) mean a major bump can change runtime behavior in ways the
-# test suite won't fully exercise (e.g. an openai SDK rewrite). Those PRs stay
-# open for human review. To auto-merge everything, drop the `if` on the
-# enable step.
+# Major version bumps are deliberately NOT auto-merged: a major bump can change
+# runtime behavior in ways the test suite won't fully exercise (e.g. an SDK
+# rewrite). Those PRs stay open for human review. To auto-merge everything,
+# drop the `if` on the enable step.
 
 on: pull_request
 
