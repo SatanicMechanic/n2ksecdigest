@@ -19,6 +19,10 @@ on: pull_request
 permissions:
   contents: write
   pull-requests: write
+  # A permissions block sets everything unlisted to `none`, so the `gh pr
+  # checks` poll below needs these explicitly to read the Tests check run.
+  checks: read
+  actions: read
 
 jobs:
   auto-merge:

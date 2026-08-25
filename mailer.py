@@ -2,8 +2,7 @@
 
 import os
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util import Retry
+from requests.adapters import HTTPAdapter, Retry
 
 
 _RESEND_URL = "https://api.resend.com/emails"

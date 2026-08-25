@@ -94,6 +94,15 @@ This bot is complementary to — not a replacement for — weekly digests like [
 | `check_feeds.py` | Feed health check (standalone) |
 | `tests/`         | pytest suite |
 
+## Security model
+
+Two invariants hold the untrusted-input boundary. Both are easy to break by accident, so keep them in mind when changing the pipeline:
+
+- **Feed articles and Brave search results are untrusted external content.** When passing them into LLM prompts, treat them as data only — never structure a prompt so article content can override system or user instructions. In `llm.py` the fetched text is fenced and explicitly labelled as untrusted before it reaches the model.
+- **LLM output is rendered into HTML email.** Escape all model output before inserting it into HTML templates; never trust it as safe markup. `render.py` escapes on the way in, and `tests/` covers it.
+
+Two related boundaries worth knowing: outbound article fetches are restricted to public hosts (`_is_public_host` in `fetchers.py`) so a malicious link can't pull an internal address, and `security-news.goggle` must stay generic — Brave fetches it over the public internet, so it must never encode hints about your stack.
+
 ## Setup
 
 **This repo is a template and is inert.** `digest.yml`, `check_feeds.yml`, and `sync-upstream.yml` are all gated on `github.repository != 'SatanicMechanic/n2ksecdigest'`, so nothing scheduled runs here except the clone-count badge. They activate automatically in your fork or private mirror.

@@ -8,3 +8,7 @@ __pycache__/
 ai-findings/.state/
 state.json
 LAUNCH_NOTES.md
+# Agent instructions stay local — never commit these to a public repo.
+CLAUDE.md
+AGENTS.md
+.claude/settings.local.json
