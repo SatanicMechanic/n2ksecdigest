@@ -81,10 +81,15 @@ jobs:
         if: always()
         run: |
           uv run python state.py
-          if ! git diff --quiet -- state.json; then
+          # Stage first, then diff the index — `git diff` ignores untracked
+          # files, so checking before staging skipped this commit entirely.
+          # -f because .gitattributes keeps .gitignore fork-local (merge=ours),
+          # so private mirrors still list state.json there and a bare `git add`
+          # would exit 1 and fail this step under `bash -e`.
+          git add -f state.json
+          if ! git diff --cached --quiet -- state.json; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add state.json
             git commit -m "chore: persist sent digest state [skip ci]"
             git push
           fi

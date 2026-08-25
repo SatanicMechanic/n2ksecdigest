@@ -25,26 +25,6 @@ jobs:
           enable-cache: true
           python-version: '3.12'
 
-      # TEMPORARY: the failure surfaced as `gh` exiting 1 with no output at
-      # all, which a normal 401/403 never does. This runs the same call
-      # outside Python with stderr forced into the log. Delete once diagnosed.
-      - name: DEBUG raw gh api call
-        env:
-          GH_TOKEN: ${{ secrets.TRAFFIC_PAT }}
-        run: |
-          echo "--- gh version ---"
-          gh --version 2>&1 || echo "gh --version exit: $?"
-          echo "--- token sanity (no value printed) ---"
-          echo "length: ${#GH_TOKEN}"
-          case "$GH_TOKEN" in
-            *[[:space:]]*) echo "WARNING: token contains whitespace" ;;
-            *) echo "no embedded whitespace" ;;
-          esac
-          echo "--- gh auth status ---"
-          gh auth status 2>&1 || echo "auth status exit: $?"
-          echo "--- gh api -i ---"
-          gh api "repos/$GITHUB_REPOSITORY/traffic/clones" -i 2>&1 || echo "api exit: $?"
-
       - name: Update traffic badge
         env:
           # repos/{owner}/{repo}/traffic/clones needs the "Administration"
@@ -57,10 +37,13 @@ jobs:
 
       - name: Commit if changed
         run: |
-          if ! git diff --quiet -- badges/; then
+          # Stage first, then diff the index: badges/ is untracked on the very
+          # first run and `git diff` ignores untracked files, so checking
+          # before staging silently skipped the commit forever.
+          git add badges/
+          if ! git diff --cached --quiet -- badges/; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add badges/
             git commit -m "chore: update traffic badge [skip ci]"
             git push
           fi

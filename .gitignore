@@ -6,5 +6,4 @@ __pycache__/
 .pytest_cache/
 .venv/
 ai-findings/.state/
-state.json
 LAUNCH_NOTES.md
