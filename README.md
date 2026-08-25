@@ -200,16 +200,16 @@ The triage bars live in `prompt_threat.txt` (fire-tier threats + compliance) and
 
 ## State persistence
 
-`state.json` is persisted between runs via GitHub Actions cache (key prefix `digest-state-`), with its durable subset also committed to git (see below). Two TTL classes share the file:
+`state.json` is persisted between runs via GitHub Actions cache (key prefix `digest-state-`). It is gitignored and never committed. Two TTL classes share the file:
 
 - **sent** — article was delivered in a digest; suppressed for 30 days
 - **candidate** — article reached triage but wasn't selected; cooled down 5 days
 
 URLs are canonicalized before storage: scheme/host lowercased, fragment stripped, tracking params (utm_*, fbclid, gclid, etc.) removed, default ports and trailing slashes dropped. So `https://Example.com/a/?utm_source=x` and `https://example.com/a` collapse.
 
-The cache save step runs with `if: always()` so state is preserved even when the digest is skipped or fails. The 7-day Actions cache eviction window is much longer than the weekday run cadence, so state survives weekends.
+The cache save step runs with `if: always()` so state is preserved even when the digest is skipped or fails. The 7-day Actions cache eviction window is much longer than the weekday run cadence (twice per weekday), so the cache is never idle long enough to expire and state survives weekends. If the cache is ever evicted, the bot starts fresh — sent/candidate history is lost, so some suppressed items may reappear until they age out.
 
-Because the Actions cache is best-effort (evictable under storage pressure), the **sent** subset alone is also committed back to the repo as `state.json` by the "Commit durable state" step — losing it causes visible bugs (repeat stories), so it needs a durable home. **candidate** cooldown stays cache-only; losing it just lets a near-miss resurface a day early, which triage self-corrects. `state.json` is therefore a tracked file: a local `python digest.py` run will dirty it with your full local state, so don't commit it by hand — let CI own the committed copy.
+v1.2.0 tried committing the **sent** subset back to the repo as a durability backstop. It never worked (the commit gate ran `git diff` before staging, which ignores untracked files) and was removed in v1.2.1: `main`'s ruleset requires a PR plus the `test` check, GitHub Actions is not an eligible bypass actor, and the digest job is the one job that must not hold a bypass credential — `requirements.txt` uses `>=` floors with no lockfile, so branch protection is what stops a bad dependency release from pushing to `main`. A repeated story ages out in 30 days; that trade wasn't worth it.
 
 ## Costs
 

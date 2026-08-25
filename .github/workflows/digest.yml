@@ -71,25 +71,13 @@ jobs:
           path: state.json
           key: digest-state-${{ github.run_id }}
 
-      # actions/cache is best-effort (evictable under storage pressure or
-      # after 7 days unused) — it silently reset dedup history before. The
-      # 'sent' subset is what actually causes visible bugs when lost (repeat
-      # stories), so it alone gets committed to git for durability. 'candidate'
-      # cooldown stays cache-only: losing it just lets a near-miss resurface
-      # a day early, which the LLM triage self-corrects.
-      - name: Commit durable state
-        if: always()
-        run: |
-          uv run python state.py
-          # Stage first, then diff the index — `git diff` ignores untracked
-          # files, so checking before staging skipped this commit entirely.
-          # -f because .gitattributes keeps .gitignore fork-local (merge=ours),
-          # so private mirrors still list state.json there and a bare `git add`
-          # would exit 1 and fail this step under `bash -e`.
-          git add -f state.json
-          if ! git diff --cached --quiet -- state.json; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "chore: persist sent digest state [skip ci]"
-            git push
-          fi
+      # State is cache-only. Committing the 'sent' subset back to the repo was
+      # tried (v1.2.0) and never worked: the gate checked `git diff` before
+      # staging, which ignores untracked files, so it silently never fired.
+      # Fixing the gate then exposed the real blocker — main's ruleset requires
+      # a PR plus the "test" check, and GitHub Actions is not an eligible bypass
+      # actor. The only way through is a bypass credential, which this job must
+      # not hold: requirements.txt pins floors (`>=`) with no lockfile, so one
+      # bad release runs code here and branch protection is what stops that
+      # becoming a push to main. Losing the cache costs a repeated story, which
+      # ages out in 30 days — not worth that trade.

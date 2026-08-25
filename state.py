@@ -158,20 +158,3 @@ def recent_sent_headlines(state: dict, days: int = 7) -> list[str]:
         if v.get("status") == "sent" and v.get("date", "") >= cutoff and v.get("headline")
     ]
     return [h for _, h in sorted(entries, reverse=True)]
-
-
-def sent_only(state: dict) -> dict:
-    """Return only the 'sent' entries — the durable subset worth git-committing.
-
-    'candidate' cooldown entries are cheap to lose (worst case a near-miss
-    resurfaces a day early) so they're left on the best-effort actions/cache
-    layer rather than committed.
-    """
-    return {url: entry for url, entry in state.items() if entry.get("status") == "sent"}
-
-
-if __name__ == "__main__":
-    # Overwrite state.json with just its durable subset, for the workflow step
-    # that commits state.json to git after actions/cache has already saved
-    # the full (sent + candidate) state.
-    save_state(sent_only(load_state()))

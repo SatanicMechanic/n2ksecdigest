@@ -170,16 +170,6 @@ def test_recent_sent_headlines_excludes_no_headline(tmp_path, monkeypatch):
     assert result == ["Has headline"]
 
 
-def test_sent_only_drops_candidates():
-    s = {
-        "https://example.com/a": {"status": "sent", "date": "2026-01-01"},
-        "https://example.com/b": {"status": "candidate", "date": "2026-01-01"},
-    }
-    result = state.sent_only(s)
-    assert "https://example.com/a" in result
-    assert "https://example.com/b" not in result
-
-
 def test_atomic_save_does_not_corrupt_on_error(tmp_path, monkeypatch):
     """save_state uses write-then-rename so a partial file never replaces a good one."""
     monkeypatch.setattr(state, "_state_path", lambda: str(tmp_path / "state.json"))

@@ -9,8 +9,9 @@ on:
     - cron: '30 6 * * *'  # daily; offset from digest/sync-upstream/check_feeds crons
   workflow_dispatch:
 
+# The PAT below does the pushing, so GITHUB_TOKEN needs no write access.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   update-badge:
@@ -18,7 +19,14 @@ jobs:
     timeout-minutes: 5
     if: github.repository == 'SatanicMechanic/n2ksecdigest'
     steps:
+      # Checkout with the PAT so the push below carries it: main's ruleset
+      # requires a PR + the "test" check, and GitHub Actions is not an
+      # eligible bypass actor. The PAT acts as a repository admin, which is
+      # already on the bypass list. Safe here because this job installs no
+      # third-party dependencies — see the note in digest.yml.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          token: ${{ secrets.TRAFFIC_PAT }}
 
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9  # v9.0.0
         with:
