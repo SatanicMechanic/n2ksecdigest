@@ -10,6 +10,7 @@ The primary provider is configured entirely by env (see config.py).
 
 import os
 import json
+import re
 import datetime
 
 import requests
@@ -129,6 +130,35 @@ def parse_query_json(raw: str) -> list[str]:
     return []
 
 
+# A real CVE ID is CVE-YYYY-NNNN+ (4+ digits). Anything shaped like a CVE
+# reference that doesn't match is a placeholder the model typed instead of a
+# real ID (e.g. "CVE-2026-XXXX") — a strong hallucination signal, since a
+# model quoting from real source text has an actual number to copy.
+_CVE_TOKEN_RE = re.compile(r"CVE-\d{4}-[A-Za-z0-9]+", re.IGNORECASE)
+_VALID_CVE_RE = re.compile(r"^CVE-\d{4}-\d{4,}$", re.IGNORECASE)
+
+
+def _has_fabricated_cve(item: dict) -> bool:
+    text = " ".join(item.get(k) or "" for k in ("headline", "why", "action"))
+    return any(not _VALID_CVE_RE.match(tok) for tok in _CVE_TOKEN_RE.findall(text))
+
+
+def _stack_grounded(item: dict, stack_summary: str) -> bool:
+    """Category-1 threat items must ground relevance in a verbatim stack quote.
+
+    prompt_threat.txt already tells the model to SKIP anything not listed in
+    the stack summary, but that's a self-reported rule — nothing stops the
+    model from asserting relevance for an out-of-stack product anyway. Requiring
+    an exact quote makes the claim checkable: a fabricated relevance claim
+    can't produce a real substring match. Compliance items aren't tied to a
+    specific stack product, so they're exempt.
+    """
+    if item.get("category") != "threat":
+        return True
+    quote = (item.get("stack_match") or "").strip()
+    return bool(quote) and quote.lower() in stack_summary.lower()
+
+
 def parse_triage_output(raw: str) -> list[dict] | None:
     """Returns list of items, or None on skip. Raises RuntimeError on bad JSON.
 
@@ -148,18 +178,28 @@ def parse_triage_output(raw: str) -> list[dict] | None:
         raise RuntimeError(f"LLM 'items' is not a list.\n\nRaw output:\n{raw}")
 
     # Schema sanity-check: drop entries missing required fields rather than
-    # rendering them as blanks.
+    # rendering them as blanks. Then two hallucination guardrails: a
+    # placeholder CVE, or a threat item that can't ground its relevance in an
+    # exact stack.txt quote.
     required = ("headline", "category", "severity", "why", "action", "url")
     clean_items = []
     for item in items:
         if not isinstance(item, dict):
             continue
-        if all(item.get(k) for k in required):
-            clean_items.append(item)
-        else:
+        if not all(item.get(k) for k in required):
             missing = [k for k in required if not item.get(k)]
             print(f"Warning: dropping LLM item missing fields {missing}: "
                   f"{item.get('headline','(no headline)')!r}")
+            continue
+        if _has_fabricated_cve(item):
+            print(f"Warning: dropping LLM item with a malformed CVE reference "
+                  f"(hallucination signal): {item.get('headline','(no headline)')!r}")
+            continue
+        if not _stack_grounded(item, STACK_SUMMARY):
+            print(f"Warning: dropping LLM item that failed stack-grounding "
+                  f"(no verbatim stack_match quote): {item.get('headline','(no headline)')!r}")
+            continue
+        clean_items.append(item)
     return clean_items
 
 
@@ -529,9 +569,15 @@ def enrich_items(items: list[dict]) -> list[dict]:
             action = data.get("action")
             if (isinstance(why, str) and why.strip()
                     and isinstance(action, str) and action.strip()):
-                item["why"] = why.strip()[:_ENRICH_FIELD_MAX_CHARS]
-                item["action"] = action.strip()[:_ENRICH_FIELD_MAX_CHARS]
-                print(f"Enriched: {item.get('headline', url)!r}")
+                why = why.strip()[:_ENRICH_FIELD_MAX_CHARS]
+                action = action.strip()[:_ENRICH_FIELD_MAX_CHARS]
+                if _has_fabricated_cve({"why": why, "action": action}):
+                    print(f"Enrichment rewrite had a malformed CVE reference; "
+                          f"keeping original: {url}")
+                else:
+                    item["why"] = why
+                    item["action"] = action
+                    print(f"Enriched: {item.get('headline', url)!r}")
             else:
                 print(f"Enrichment returned unusable fields; keeping originals: {url}")
         except Exception as exc:

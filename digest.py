@@ -98,6 +98,20 @@ def _merge_triage_results(items_a, items_b) -> list:
     return (a_picks + b_picks)[:TRIAGE_GLOBAL_CAP]
 
 
+def _fail_on_total_triage_failure(threat_exc: Exception | None,
+                                   tooling_exc: Exception | None) -> None:
+    """Both triage calls failing (not a legitimate SKIP) means an outage —
+    auth, billing, network — not a quiet news day. A silent return here would
+    let a scheduled run finish "successfully" having sent nothing; raise
+    instead so the Actions run goes red and GitHub's scheduled-workflow
+    failure notification actually fires.
+    """
+    raise RuntimeError(
+        "Both triage calls failed — no digest sent this run. "
+        f"Threat: {threat_exc!r}. Tooling: {tooling_exc!r}."
+    )
+
+
 def get_lookback_hours() -> int:
     """72 hours on Monday (covers the weekend), 24 hours otherwise."""
     return 72 if datetime.date.today().weekday() == 0 else 24
@@ -245,10 +259,13 @@ def run() -> None:
     print("Triaging (threat + tooling in parallel)...")
     raw_threat: str = ""
     raw_tooling: str = ""
-    # call_llm tries xAI then falls back to GitHub Models, so worst-case wall
-    # time for one future is roughly 2 * LLM_TIMEOUT_SEC. Add slack and let
-    # the future-level timeout act as a hard backstop if both SDKs misbehave.
-    triage_deadline = (LLM_TIMEOUT_SEC * 2) + 10
+    threat_exc: Exception | None = None
+    tooling_exc: Exception | None = None
+    # call_llm makes a single request and raises on failure (see llm.py —
+    # there is no provider fallback), so worst-case wall time for one future
+    # is roughly LLM_TIMEOUT_SEC. Add slack and let the future-level timeout
+    # act as a hard backstop if the SDK hangs instead of raising.
+    triage_deadline = LLM_TIMEOUT_SEC + 10
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         fut_threat = executor.submit(
             call_llm, threat_prompt, threat_user_msg,
@@ -261,10 +278,12 @@ def run() -> None:
         try:
             raw_threat = fut_threat.result(timeout=triage_deadline)
         except Exception as exc:
+            threat_exc = exc
             print(f"Threat triage call failed: {exc}")
         try:
             raw_tooling = fut_tooling.result(timeout=triage_deadline)
         except Exception as exc:
+            tooling_exc = exc
             print(f"Tooling triage call failed: {exc}")
 
     pool_summary = (
@@ -293,9 +312,8 @@ def run() -> None:
     print(f"Raw LLM output written to {log_path}")
 
     if not raw_threat and not raw_tooling:
-        print("Both triage calls failed. Persisting state and exiting.")
         save_state(state)
-        return
+        _fail_on_total_triage_failure(threat_exc, tooling_exc)
 
     # Parse each call independently: bad JSON from one must not discard the
     # other's good output or crash the run before save_state.

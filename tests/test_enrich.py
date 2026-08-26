@@ -195,6 +195,21 @@ def test_enrich_items_keeps_originals_when_llm_raises(monkeypatch):
     assert out[0]["action"] == "original action"
 
 
+def test_enrich_items_rejects_rewrite_with_placeholder_cve(monkeypatch):
+    """Enrichment can hallucinate a fake CVE just as easily as triage can —
+    the guardrail must apply to its rewrite too, not just the triage-time text."""
+    monkeypatch.setattr(fetchers, "fetch_article_text", lambda url: _LONG_TEXT)
+    monkeypatch.setattr(
+        llm, "call_llm",
+        lambda *a, **k: json.dumps({
+            "why": "Exploiting CVE-2026-XXXX in the wild.",
+            "action": "Patch now.",
+        }))
+    out = llm.enrich_items([_item()])
+    assert out[0]["why"] == "original why"
+    assert out[0]["action"] == "original action"
+
+
 def test_enrich_items_caps_field_length(monkeypatch):
     monkeypatch.setattr(fetchers, "fetch_article_text", lambda url: _LONG_TEXT)
     monkeypatch.setattr(

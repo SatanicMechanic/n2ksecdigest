@@ -43,9 +43,10 @@ def test_parse_query_json_single_line_fenced():
     assert llm.parse_query_json('```["a","b"]```') == ["a", "b"]
 
 
-def test_parse_triage_output_tolerates_fenced_json():
+def test_parse_triage_output_tolerates_fenced_json(monkeypatch):
     """Defense-in-depth: provider regressions to fenced output shouldn't blow up."""
-    payload = '```json\n{"items": [{"headline":"x","category":"threat","severity":"high","why":"y","action":"z","url":"https://example.com"}]}\n```'
+    monkeypatch.setattr(llm, "STACK_SUMMARY", "CI/CD & SCM: GitHub")
+    payload = '```json\n{"items": [{"headline":"x","category":"threat","severity":"high","why":"y","action":"z","url":"https://example.com","stack_match":"GitHub"}]}\n```'
     items = llm.parse_triage_output(payload)
     assert len(items) == 1
     assert items[0]["headline"] == "x"
@@ -71,20 +72,24 @@ def test_parse_triage_output_skip_returns_none():
     assert llm.parse_triage_output('{"skip": true}') is None
 
 
-def test_parse_triage_output_valid():
+def test_parse_triage_output_valid(monkeypatch):
+    monkeypatch.setattr(llm, "STACK_SUMMARY", "CI/CD & SCM: GitHub")
     payload = {"items": [{
         "headline": "x", "category": "threat", "severity": "high",
         "why": "y", "action": "z", "url": "https://example.com",
+        "stack_match": "GitHub",
     }]}
     items = llm.parse_triage_output(json.dumps(payload))
     assert len(items) == 1
     assert items[0]["headline"] == "x"
 
 
-def test_parse_triage_output_drops_incomplete_items():
+def test_parse_triage_output_drops_incomplete_items(monkeypatch):
+    monkeypatch.setattr(llm, "STACK_SUMMARY", "CI/CD & SCM: GitHub")
     payload = {"items": [
         {"headline": "complete", "category": "threat", "severity": "high",
-         "why": "w", "action": "a", "url": "https://example.com"},
+         "why": "w", "action": "a", "url": "https://example.com",
+         "stack_match": "GitHub"},
         {"headline": "missing-url", "category": "threat", "severity": "high",
          "why": "w", "action": "a"},  # no url
         {"headline": "", "category": "threat", "severity": "high",
@@ -103,6 +108,53 @@ def test_parse_triage_output_invalid_json_raises():
 def test_parse_triage_output_non_dict_raises():
     with pytest.raises(RuntimeError):
         llm.parse_triage_output("[1, 2, 3]")
+
+
+# --- hallucination guardrails: fabricated CVEs, ungrounded stack claims ---
+
+def _threat_item(**overrides):
+    item = {
+        "headline": "x", "category": "threat", "severity": "high",
+        "why": "y", "action": "z", "url": "https://example.com",
+        "stack_match": "GitHub",
+    }
+    item.update(overrides)
+    return item
+
+
+def test_parse_triage_output_drops_placeholder_cve(monkeypatch):
+    monkeypatch.setattr(llm, "STACK_SUMMARY", "CI/CD & SCM: GitHub")
+    payload = {"items": [_threat_item(why="Exploiting CVE-2026-XXXX in the wild.")]}
+    assert llm.parse_triage_output(json.dumps(payload)) == []
+
+
+def test_parse_triage_output_accepts_real_looking_cve(monkeypatch):
+    monkeypatch.setattr(llm, "STACK_SUMMARY", "CI/CD & SCM: GitHub")
+    payload = {"items": [_threat_item(why="Exploiting CVE-2026-41234 in the wild.")]}
+    items = llm.parse_triage_output(json.dumps(payload))
+    assert len(items) == 1
+
+
+def test_parse_triage_output_drops_threat_item_without_stack_match(monkeypatch):
+    monkeypatch.setattr(llm, "STACK_SUMMARY", "CI/CD & SCM: GitHub")
+    payload = {"items": [_threat_item(stack_match="")]}
+    assert llm.parse_triage_output(json.dumps(payload)) == []
+
+
+def test_parse_triage_output_drops_threat_item_with_ungrounded_stack_match(monkeypatch):
+    """stack_match must be a real quote — a plausible-sounding one that isn't
+    actually in stack.txt (e.g. an out-of-stack product like GitLab) is exactly
+    the fabrication this check exists to catch."""
+    monkeypatch.setattr(llm, "STACK_SUMMARY", "CI/CD & SCM: GitHub")
+    payload = {"items": [_threat_item(stack_match="GitLab", why="Affects our CI/CD pipeline.")]}
+    assert llm.parse_triage_output(json.dumps(payload)) == []
+
+
+def test_parse_triage_output_compliance_items_exempt_from_stack_match(monkeypatch):
+    monkeypatch.setattr(llm, "STACK_SUMMARY", "CI/CD & SCM: GitHub")
+    payload = {"items": [_threat_item(category="compliance", stack_match="")]}
+    items = llm.parse_triage_output(json.dumps(payload))
+    assert len(items) == 1
 
 
 # --- build_triage_input ---

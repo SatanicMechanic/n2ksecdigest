@@ -1,7 +1,7 @@
-"""Tests for digest._merge_triage_results."""
+"""Tests for digest._merge_triage_results and total-triage-failure handling."""
 
 import pytest
-from digest import _merge_triage_results
+from digest import _merge_triage_results, _fail_on_total_triage_failure
 
 
 def _item(url, category="threat", headline=None):
@@ -109,3 +109,16 @@ def test_items_with_none_url_are_excluded():
           "why": "w", "action": "a", "url": None}]
     result = _merge_triage_results(a, None)
     assert result == []
+
+
+# --- _fail_on_total_triage_failure: both calls erroring must be loud ---
+
+def test_fail_on_total_triage_failure_raises_with_both_errors():
+    with pytest.raises(RuntimeError, match="Both triage calls failed"):
+        _fail_on_total_triage_failure(ValueError("bad key"), TimeoutError("slow"))
+
+
+def test_fail_on_total_triage_failure_message_includes_both_exceptions():
+    with pytest.raises(RuntimeError) as exc_info:
+        _fail_on_total_triage_failure(ValueError("bad key"), None)
+    assert "bad key" in str(exc_info.value)

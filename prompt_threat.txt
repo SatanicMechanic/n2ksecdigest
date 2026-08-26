@@ -21,6 +21,7 @@ For each selected item, provide:
 4. **why** — 1–2 sentences specifically explaining WHY THIS IS ON FIRE RIGHT NOW (convergence across sources, urgent language in coverage, emergency advisory, active mass exploitation) AND the specific impact to our products, customers, or delivery pipeline
 5. **action** — what the reader should do in the next few hours (not "patch when convenient"; that's scanner territory)
 6. **url** — original URL of the primary source
+7. **stack_match** — required when category is "threat": the exact phrase copied verbatim, character-for-character, from the stack summary below that establishes why this item is in scope (e.g. "GitHub" or "Palo Alto Networks firewalls (PAN-OS"). If you cannot copy a real quote, the item is not actually in the stack — SKIP it instead of leaving this blank or paraphrasing it. Leave "" for category "compliance".
 
 {{STACK}}
 
@@ -100,7 +101,8 @@ Schema:
       "severity": "critical|high|medium",
       "why": "string",
       "action": "string",
-      "url": "string"
+      "url": "string",
+      "stack_match": "string"
     }
   ]
 }
