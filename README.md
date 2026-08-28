@@ -260,6 +260,8 @@ Anywhere from **free to about $0.60/month**, depending on your choice of provide
 - Resend: 3,000 emails/month free; this sends ≤22/month — and typically far fewer given the SKIP-preferred bar
 - All RSS feeds: no auth required
 
+The author's own instance currently runs at **$0/month**, using `mistral-medium-latest` on Mistral's free tier.
+
 ## Failure modes
 
 - **All feeds dead**: RSS pool empty; search-only digest if queries still generate; SKIP if nothing found
