@@ -23,5 +23,5 @@ jobs:
           enable-cache: true
           python-version: '3.12'
       - run: uv venv
-      - run: uv pip install -r requirements.txt
+      - run: uv pip install --require-hashes -r requirements.txt
       - run: uv run python check_feeds.py

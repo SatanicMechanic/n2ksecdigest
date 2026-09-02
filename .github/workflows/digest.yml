@@ -8,8 +8,12 @@ on:
     - cron: '55 22 * * 1-5'
   workflow_dispatch:
 
+# Read-only: this job never commits or pushes. Its only writes are the
+# actions/cache save+restore below, which use the Actions cache service, not
+# GITHUB_TOKEN. Keeping it read means the job holding every provider API key
+# carries no repo-write it can't use.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: digest
@@ -25,6 +29,11 @@ jobs:
     if: github.repository != 'SatanicMechanic/n2ksecdigest'
 
     steps:
+      - name: Harden runner (egress audit)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # v2.21.1
+        with:
+          egress-policy: audit
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
@@ -37,7 +46,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv
-          uv pip install -r requirements.txt
+          uv pip install --require-hashes -r requirements.txt
 
       - name: Restore digest state
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0

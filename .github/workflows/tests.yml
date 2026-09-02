@@ -23,5 +23,9 @@ jobs:
           enable-cache: true
           python-version: '3.12'
       - run: uv venv
-      - run: uv pip install -r requirements.txt -r requirements-dev.txt
+      # No fallback and no dependabot exemption: a hash mismatch means the
+      # artifact on the index is not the one we pinned. That must fail the
+      # `test` check so dependabot-auto-merge refuses the PR. Fix by running
+      # `uv pip compile --generate-hashes`, not by installing unverified.
+      - run: uv pip install --require-hashes -r requirements.txt -r requirements-dev.txt
       - run: uv run pytest -q

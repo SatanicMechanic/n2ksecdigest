@@ -35,6 +35,13 @@ jobs:
     if: github.repository != 'SatanicMechanic/n2ksecdigest'
 
     steps:
+      # First step so it instruments the whole job — this is the only job that
+      # executes freshly-merged upstream code (the pytest gate below).
+      - name: Harden runner (egress audit)
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1  # v2.21.1
+        with:
+          egress-policy: audit
+
       # persist-credentials off: the test step below executes freshly-merged
       # upstream code, which must not have a push-capable token in reach.
       # The push step supplies the token explicitly.
@@ -69,7 +76,7 @@ jobs:
         if: steps.merge.outputs.changed == 'true'
         run: |
           uv venv
-          uv pip install -r requirements.txt -r requirements-dev.txt
+          uv pip install --require-hashes -r requirements.txt -r requirements-dev.txt
           uv run pytest -q
 
       - name: Push
