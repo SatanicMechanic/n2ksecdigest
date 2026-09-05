@@ -10,22 +10,30 @@ from urllib.parse import urlsplit
 
 
 _CATEGORY_LABEL = {
-    "threat":     "🔴 Threat",
-    "tooling":    "🔧 Tooling Update",
-    "compliance": "📋 Compliance/Policy",
+    "threat":     "Threat",
+    "tooling":    "Tooling Update",
+    "compliance": "Compliance / Policy",
 }
 
-_SEVERITY_LABEL = {
-    "critical": "🔴 Critical",
-    "high":     "🟠 High",
-    "medium":   "🟡 Medium",
+# Severity reads as a solid chip: (label, background, text color).
+_SEVERITY_CHIP = {
+    "critical": ("Critical", "#ef4444", "#180404"),
+    "high":     ("High",     "#f97316", "#1a0902"),
+    "medium":   ("Medium",   "#eab308", "#1a1302"),
 }
 
-_SEVERITY_BORDER = {
-    "critical": "#ef4444",
-    "high":     "#f97316",
-    "medium":   "#eab308",
-}
+_MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+
+_PAGE_BG = "#0b1220"
+_CARD_BG = "#131d2f"
+_INSET_BG = "#0b1220"
+_BORDER = "#24324a"
+_RULE = "#1e2c42"
+_TEXT = "#f1f5f9"
+_TEXT_DIM = "#9fb0c6"
+_TEXT_MUTED = "#64748b"
+_AMBER = "#f5a524"
+_LINK = "#38bdf8"
 
 
 def _safe_url(url: str) -> str:
@@ -52,9 +60,9 @@ def _esc(s: str) -> str:
 def _item_card(index: int, item: dict) -> str:
     cat = (item.get("category") or "").lower()
     sev = (item.get("severity") or "").lower()
-    border = _SEVERITY_BORDER.get(sev, "#475569")
     cat_label = _CATEGORY_LABEL.get(cat, _esc(cat.title()))
-    sev_label = _SEVERITY_LABEL.get(sev, _esc(sev.title()))
+    sev_label, chip_bg, chip_fg = _SEVERITY_CHIP.get(
+        sev, (_esc(sev.title()) or "Unrated", "#475569", "#e2e8f0"))
 
     headline = _esc(item.get("headline", ""))
     why = _esc(item.get("why", ""))
@@ -62,47 +70,76 @@ def _item_card(index: int, item: dict) -> str:
     url = _safe_url(item.get("url", ""))
     link_html = ""
     if url != "#":
-        link_html = f"""<a href="{_esc(url)}"
-                 style="font-size:12px; font-family:monospace; color:#38bdf8;
-                        text-decoration:none;">
-                Read more →
-              </a>"""
+        link_html = f"""
+              <p style="margin:16px 0 0 0;">
+                <a href="{_esc(url)}"
+                   style="display:inline-block; padding:9px 16px;
+                          border:1px solid {_BORDER}; font-size:12px;
+                          font-family:{_MONO}; letter-spacing:0.08em;
+                          text-transform:uppercase; color:{_LINK};
+                          text-decoration:none;">
+                  Read more →
+                </a>
+              </p>"""
 
     return f"""
     <tr>
-      <td style="padding: 0 0 18px 0;">
+      <td style="padding:0 0 16px 0;">
         <table width="100%" cellpadding="0" cellspacing="0" border="0"
-               style="background:#1e293b; border-radius:8px;
-                      border-left:4px solid {border};">
+               style="background:{_CARD_BG}; border:1px solid {_BORDER};">
           <tr>
-            <td style="padding:20px 24px;">
+            <td style="padding:22px 24px 24px 24px;">
 
-              <p style="margin:0 0 10px 0; font-size:11px; font-family:monospace;
-                         text-transform:uppercase; letter-spacing:0.08em; color:#64748b;">
-                {index}&nbsp;&nbsp;·&nbsp;&nbsp;{cat_label}&nbsp;&nbsp;·&nbsp;&nbsp;{sev_label}
-              </p>
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="font-size:0; line-height:0;">
+                    <span style="display:inline-block; padding:4px 9px;
+                                 background:{chip_bg}; color:{chip_fg};
+                                 font-family:{_MONO}; font-size:11px;
+                                 font-weight:700; letter-spacing:0.1em;
+                                 text-transform:uppercase;">{sev_label}</span><span
+                          style="display:inline-block; padding-left:12px;
+                                 font-family:{_MONO}; font-size:11px;
+                                 letter-spacing:0.1em; text-transform:uppercase;
+                                 color:{_TEXT_MUTED};">{cat_label}</span>
+                  </td>
+                  <td align="right" style="font-family:{_MONO}; font-size:11px;
+                                           letter-spacing:0.1em; color:#3f4d64;">
+                    {index:02d}
+                  </td>
+                </tr>
+              </table>
 
-              <p style="margin:0 0 14px 0; font-size:16px; font-weight:700;
-                         color:#f1f5f9; line-height:1.45;">
+              <p style="margin:16px 0 0 0; font-size:19px; font-weight:700;
+                         color:{_TEXT}; line-height:1.38; letter-spacing:-0.01em;">
                 {headline}
               </p>
 
-              <p style="margin:0 0 4px 0; font-size:11px; font-family:monospace;
-                         text-transform:uppercase; letter-spacing:0.06em; color:#475569;">
+              <p style="margin:18px 0 5px 0; font-size:11px; font-family:{_MONO};
+                         text-transform:uppercase; letter-spacing:0.1em; color:{_TEXT_MUTED};">
                 Why it matters
               </p>
-              <p style="margin:0 0 12px 0; font-size:13px; color:#94a3b8; line-height:1.65;">
+              <p style="margin:0; font-size:14px; color:{_TEXT_DIM}; line-height:1.62;">
                 {why}
               </p>
 
-              <p style="margin:0 0 4px 0; font-size:11px; font-family:monospace;
-                         text-transform:uppercase; letter-spacing:0.06em; color:#475569;">
-                Action
-              </p>
-              <p style="margin:0 0 16px 0; font-size:13px; color:#94a3b8; line-height:1.65;">
-                {action}
-              </p>
-
+              <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                     style="margin-top:18px;">
+                <tr>
+                  <td style="background:{_INSET_BG}; border:1px solid {_BORDER};
+                             padding:14px 16px;">
+                    <p style="margin:0 0 5px 0; font-size:11px; font-family:{_MONO};
+                               text-transform:uppercase; letter-spacing:0.1em;
+                               color:{_AMBER};">
+                      Action
+                    </p>
+                    <p style="margin:0; font-size:14px; color:{_TEXT};
+                               line-height:1.62;">
+                      {action}
+                    </p>
+                  </td>
+                </tr>
+              </table>
               {link_html}
 
             </td>
@@ -115,44 +152,70 @@ def _item_card(index: int, item: dict) -> str:
 def render_html(items: list[dict], date_str: str) -> str:
     cards = "\n".join(_item_card(i, item) for i, item in enumerate(items, 1))
     date_safe = _esc(date_str)
+    n = len(items)
+    count = f"{n} item" if n == 1 else f"{n} items"
+    # Inbox preview line: the lead headline beats repeating the subject.
+    preheader = _esc(items[0].get("headline", "")) if items else ""
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <meta name="supported-color-schemes" content="dark">
   <title>Need to Know — {date_safe}</title>
 </head>
-<body style="margin:0; padding:0; background:#0f172a;
+<body style="margin:0; padding:0; background:{_PAGE_BG};
              font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI',
              Roboto, 'Helvetica Neue', Arial, sans-serif;">
 
+  <div style="display:none; max-height:0; overflow:hidden; opacity:0;
+              color:transparent; font-size:1px; line-height:1px;">{preheader}</div>
+
   <table width="100%" cellpadding="0" cellspacing="0" border="0"
-         style="background:#0f172a;">
+         style="background:{_PAGE_BG};">
     <tr>
-      <td align="center" style="padding:36px 16px;">
+      <td align="center" style="padding:36px 16px 44px 16px;">
         <table width="600" cellpadding="0" cellspacing="0" border="0"
                style="max-width:600px; width:100%;">
 
           <tr>
-            <td style="padding:0 0 28px 0; border-bottom:1px solid #1e293b;">
-              <p style="margin:0 0 6px 0; font-size:11px; font-family:monospace;
-                         text-transform:uppercase; letter-spacing:0.12em; color:#475569;">
-                Need to Know
-              </p>
-              <p style="margin:0; font-size:24px; font-weight:700; color:#f1f5f9;">
-                🛡️&nbsp; {date_safe}
+            <td style="height:3px; line-height:3px; font-size:0;
+                       background:{_AMBER};">&nbsp;</td>
+          </tr>
+
+          <tr>
+            <td style="padding:22px 0 20px 0; border-bottom:1px solid {_RULE};">
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="font-family:{_MONO}; font-size:21px; font-weight:700;
+                             letter-spacing:-0.01em;">
+                    <span style="color:{_AMBER};">n2k</span><span
+                          style="color:{_TEXT};">secdigest</span>
+                  </td>
+                  <td align="right" style="font-family:{_MONO}; font-size:12px;
+                                           letter-spacing:0.1em; text-transform:uppercase;
+                                           color:{_TEXT_MUTED};">
+                    {date_safe} &nbsp;·&nbsp; {count}
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:14px 0 0 0; font-size:15px; color:{_TEXT_DIM};
+                         line-height:1.55;">
+                What cleared the bar since the last run.
               </p>
             </td>
           </tr>
 
-          <tr><td style="padding-top:22px;"></td></tr>
+          <tr><td style="padding-top:24px;"></td></tr>
 
           {cards}
 
           <tr>
-            <td style="padding:12px 0 0 0; border-top:1px solid #1e293b;">
-              <p style="margin:16px 0 0 0; font-size:11px; color:#334155;
-                         text-align:center; font-family:monospace;">
+            <td style="padding:10px 0 0 0; border-top:1px solid {_RULE};">
+              <p style="margin:16px 0 0 0; font-size:11px; color:#3f4d64;
+                         text-align:center; font-family:{_MONO};
+                         letter-spacing:0.06em; line-height:1.7;">
                 Generated automatically from public security and platform feeds.
               </p>
             </td>
