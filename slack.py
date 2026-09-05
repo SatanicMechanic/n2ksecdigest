@@ -10,12 +10,12 @@ import requests
 _TIMEOUT_SEC = 10
 
 
-def send_slack(text_body: str) -> None:
+def send_slack(payload: dict) -> None:
     webhook_url = os.environ.get("SLACK_WEBHOOK_URL", "").strip()
-    if not webhook_url:
+    if not webhook_url or not payload:
         return
     try:
-        resp = requests.post(webhook_url, json={"text": text_body}, timeout=_TIMEOUT_SEC)
+        resp = requests.post(webhook_url, json=payload, timeout=_TIMEOUT_SEC)
         resp.raise_for_status()
         print("Slack notification sent.")
     except requests.RequestException as exc:

@@ -1,6 +1,8 @@
 """Tests for render.py — HTML escaping and URL validation."""
 
-from render import render_html, render_text, subject_line, _safe_url
+import json
+
+from render import render_html, render_slack, render_text, subject_line, _safe_url
 
 
 def test_html_escapes_headline_script():
@@ -105,6 +107,34 @@ def test_subject_line_medium_prefix():
 def test_subject_line_critical_wins_over_high():
     items = [_make_item("high"), _make_item("critical"), _make_item("medium")]
     assert "🔴" in subject_line(items, "Apr 15, 2026")
+
+
+def test_slack_escapes_link_markup():
+    items = [{
+        "headline": "<https://evil.example|click me>",
+        "category": "threat", "severity": "high",
+        "why": "y & z", "action": "a",
+        "url": "https://example.com/x",
+    }]
+    blob = json.dumps(render_slack(items, "Apr 15, 2026"))
+    assert "<https://evil.example|" not in blob
+    assert "&lt;https://evil.example" in blob
+
+
+def test_slack_omits_dangerous_url():
+    items = [{
+        "headline": "x", "category": "threat", "severity": "high",
+        "why": "y", "action": "z",
+        "url": "javascript:alert(1)",
+    }]
+    blob = json.dumps(render_slack(items, "Apr 15, 2026"))
+    assert "javascript:" not in blob
+
+
+def test_slack_severity_drives_attachment_color():
+    payload = render_slack([_make_item("critical")], "Apr 15, 2026")
+    assert payload["attachments"][0]["color"] == "#ef4444"
+    assert payload["text"] == subject_line([_make_item("critical")], "Apr 15, 2026")
 
 
 def test_subject_line_item_count():

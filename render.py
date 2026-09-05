@@ -1,4 +1,4 @@
-"""HTML and plain-text rendering for the digest email.
+"""HTML, plain-text and Slack rendering for the digest.
 
 All LLM-supplied content is HTML-escaped before interpolation.
 Item URLs are validated to be http/https before use as anchor targets —
@@ -273,3 +273,66 @@ def subject_line(items: list[dict], date_str: str) -> str:
     n = len(items)
     suffix = f"({n} item{'s' if n != 1 else ''})"
     return f"{prefix} Need to Know — {date_str} {suffix}"
+
+
+# ---------------------------------------------------------------------------
+# Slack
+# ---------------------------------------------------------------------------
+
+def _slack_esc(s: str) -> str:
+    """Slack's three reserved characters, so LLM text can't forge <url|link> markup."""
+    return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def render_slack(items: list[dict], date_str: str) -> dict:
+    """Block Kit payload mirroring the email cards.
+
+    Each item is its own attachment so Slack draws the severity color as a
+    left bar — the only color affordance Slack offers, and the closest thing
+    to the email's severity chip.
+    """
+    attachments = []
+    for item in items:
+        cat = (item.get("category") or "").lower()
+        sev = (item.get("severity") or "").lower()
+        cat_label = _CATEGORY_LABEL.get(cat, (cat or "Unrated").title())
+        sev_label, color, _ = _SEVERITY_CHIP.get(
+            sev, (sev.title() or "Unrated", "#475569", ""))
+
+        headline = _slack_esc(item.get("headline", ""))
+        url = _safe_url(item.get("url", ""))
+        if url != "#":
+            headline = f"<{url}|{headline}>"
+
+        attachments.append({
+            "color": color,
+            "blocks": [
+                {"type": "context", "elements": [{
+                    "type": "mrkdwn",
+                    "text": f"*{_slack_esc(sev_label)}*  ·  {_slack_esc(cat_label)}",
+                }]},
+                {"type": "section", "text": {
+                    "type": "mrkdwn", "text": f"*{headline}*"}},
+                {"type": "section", "text": {
+                    "type": "mrkdwn",
+                    "text": f"*Why it matters*\n{_slack_esc(item.get('why', ''))}",
+                }},
+                {"type": "section", "text": {
+                    "type": "mrkdwn",
+                    "text": f"*Action*\n{_slack_esc(item.get('action', ''))}",
+                }},
+            ],
+        })
+
+    return {
+        # Fallback: what push notifications and the sidebar preview show.
+        "text": subject_line(items, date_str),
+        "blocks": [{"type": "header", "text": {
+            "type": "plain_text",
+            "text": subject_line(items, date_str)[:150],
+            "emoji": True,
+        }}],
+        "attachments": attachments,
+        "unfurl_links": False,
+        "unfurl_media": False,
+    }
