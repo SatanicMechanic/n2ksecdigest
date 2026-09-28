@@ -77,4 +77,13 @@ jobs:
         if: steps.merge.outputs.changed == 'true'
         env:
           TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
-        run: git push "https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git" HEAD:main
+          HAS_SYNC_TOKEN: ${{ secrets.SYNC_TOKEN != '' }}
+        run: |
+          git push "https://x-access-token:${TOKEN}@github.com/${{ github.repository }}.git" HEAD:main || {
+            if [ "$HAS_SYNC_TOKEN" = "true" ]; then
+              echo "::error::Push failed. If the error above is an auth/403 rejection, SYNC_TOKEN may be expired or revoked — regenerate it and update the secret. See README."
+            else
+              echo "::error::Push failed. If the error above is an auth/403 rejection, github.token cannot push workflow-file changes — add a SYNC_TOKEN secret. See README."
+            fi
+            exit 1
+          }
