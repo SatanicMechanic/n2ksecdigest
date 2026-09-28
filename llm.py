@@ -540,6 +540,10 @@ Do NOT target:
 - The vendor's own advisories, KB articles, bulletins, or release notes. The
   reader IS the vendor and already has those internally — a query that returns
   the vendor's own site has found nothing the reader did not know
+- Vulnerability scanner and detection vendors' plugin, check, or signature pages
+  (Tenable/Nessus, Qualys, Rapid7, Symantec, Nuclei templates, IDS rules), new or
+  updated.
+  They restate the vendor's own advisory, so they are not the outside view
 - Product marketing, funding, earnings, analyst rankings, or partnership news
 - Generic industry commentary that names none of these products
 - Competitor products, or the platforms and ecosystems these products run on —

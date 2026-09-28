@@ -209,10 +209,12 @@ Sketch of the stack line (the real one belongs in your private mirror, not here)
   security issue in one of ours is fire-tier ... Redundancy is wanted here rather than
   suppressed, and the coverage we most need to see is third-party: a second and third
   outlet on the same issue is new information, not a duplicate ... Our own advisories and
-  KB articles do NOT qualify: we are the vendor and see those before they publish.
+  KB articles do NOT qualify: we are the vendor and see those before they publish. Scanner
+  vendors' plugin or signature pages (Tenable, Qualys, Rapid7, Symantec, Nuclei) do NOT qualify
+  either: they restate our own advisory.
 ```
 
-Decide deliberately whether your own advisories qualify. If you are the vendor you generally see them internally first, and including them spends the digest's attention on something you already know.
+Decide deliberately whether your own advisories qualify. If you are the vendor you generally see them internally first, and including them spends the digest's attention on something you already know. The same goes for scanner plugin and detection-signature pages about your CVEs: they get updated often, rank well for "<vendor> CVE" searches, and the override's trailing-coverage exemption would otherwise let an old CVE come back as fire-tier every time a plugin is revised.
 
 ### 4. Repo secrets + variables (for Actions)
 
