@@ -12,3 +12,6 @@ LAUNCH_NOTES.md
 CLAUDE.md
 AGENTS.md
 .claude/settings.local.json
+# Serena writes a per-checkout project.yml (project_name differs per clone), so
+# tracking it makes every downstream fork hit an add/add conflict on sync.
+.serena/
