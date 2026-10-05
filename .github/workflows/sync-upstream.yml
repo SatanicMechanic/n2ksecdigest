@@ -11,9 +11,10 @@ name: Sync from upstream
 #     on scheduled-workflow failure) and nothing is pushed.
 #   - Requires shared ancestry: run the one-time
 #     `git merge upstream/main --allow-unrelated-histories` setup first.
-#   - A conflict usually means upstream touched stack.txt's template or a
-#     file you changed privately — resolve manually, keeping your version
-#     of stack.txt.
+#   - Files listed merge=ours in .gitattributes (stack.txt, feeds.md, …) never
+#     conflict; this job sets the driver. A conflict means a file you changed
+#     privately was also changed upstream — promote your change upstream or
+#     drop it rather than keeping the local side.
 
 on:
   schedule:

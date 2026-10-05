@@ -11,7 +11,7 @@ LAUNCH_NOTES.md
 # Agent instructions stay local — never commit these to a public repo.
 CLAUDE.md
 AGENTS.md
-.claude/settings.local.json
+.claude/
 # Serena writes a per-checkout project.yml (project_name differs per clone), so
 # tracking it makes every downstream fork hit an add/add conflict on sync.
 .serena/

@@ -93,6 +93,18 @@ jobs:
           path: state.json
           key: digest-state-${{ github.run_id }}
 
+      # Keeps the raw triage output so a SKIP can be audited after the fact. A
+      # run that exits before triage (empty pool) writes no last_run.txt, hence
+      # ignore. Private repos only: the triage reasoning reflects stack.txt, and
+      # artifacts on a public repo are downloadable by anyone.
+      - name: Upload triage log
+        if: always() && github.event.repository.private
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: last-run
+          path: last_run.txt
+          if-no-files-found: ignore
+
       # State is cache-only. Committing the 'sent' subset back to the repo was
       # tried (v1.2.0) and never worked: the gate checked `git diff` before
       # staging, which ignores untracked files, so it silently never fired.

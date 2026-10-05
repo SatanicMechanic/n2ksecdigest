@@ -1,5 +1,12 @@
 # Fork-divergent files: private mirrors keep their own versions on sync.
-README.md            merge=ours
-security-news.goggle merge=ours
-stack.txt            merge=ours
-.gitignore           merge=ours
+# Only takes effect where `git config merge.ours.driver true` is set —
+# sync-upstream.yml sets it; run it once locally before merging by hand.
+#
+# .gitignore is deliberately NOT here: ignore rules don't affect tracked files,
+# so a mirror can track CLAUDE.md etc. regardless, and upstream additions (like
+# .serena/) should reach every mirror.
+README.md              merge=ours
+security-news.goggle   merge=ours
+stack.txt              merge=ours
+feeds.md               merge=ours
+.github/dependabot.yml merge=ours
