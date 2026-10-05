@@ -1,0 +1,41 @@
+name: Audit
+
+# Checks the pinned requirements against PyPI advisories daily. Dependabot
+# alerts are not a reliable signal on their own: on 2026-10-05 urllib3 2.7.0
+# carried three advisories (published 2026-09-30) and this repo never raised an
+# alert. This catches "an advisory was published and nothing was pushed".
+#
+# Deliberately separate from tests.yml: a new advisory turns this red without
+# blocking unrelated PRs or dependabot-auto-merge (which polls only `test`).
+# No repo guard — mirrors run it too, so every consumer gets detection.
+#
+# Red means bump the pin here, then sync. For an advisory with no fix yet, add
+# `--ignore-vuln <ID>` with a comment saying why and when to revisit.
+
+on:
+  schedule:
+    # Daily 06:29 UTC (off-round: the top of the hour is the most contended
+    # scheduling slot on Actions)
+    - cron: '29 6 * * *'
+  pull_request:
+    paths:
+      - 'requirements*.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+      # No secrets in this job, so an unhashed pip-audit install has nothing to
+      # steal. ponytail: version pinned by hand, Dependabot won't bump it — move
+      # it into requirements-dev.in if staleness becomes a problem.
+      - run: >-
+          uvx pip-audit==2.10.1
+          -r requirements.txt -r requirements-dev.txt
+          --require-hashes --disable-pip
